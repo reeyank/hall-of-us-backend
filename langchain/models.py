@@ -2,18 +2,20 @@
 Pydantic models for the LangChain wrapper
 """
 
-import logging
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 from pydantic import BaseModel
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Import the new logger module
+from .logger import get_logger
+
+# Create a logger for this module
+logger = get_logger(__name__)
 
 
 class APIResponse(BaseModel):
     """Standardized API response format"""
+
     success: bool
     data: Optional[Any] = None
     error: Optional[str] = None
@@ -23,6 +25,7 @@ class APIResponse(BaseModel):
 
 class ImageTaggingRequest(BaseModel):
     """Request model for image tagging"""
+
     image_url: Optional[str] = None
     image_base64: Optional[str] = None
     image_path: Optional[str] = None
@@ -33,21 +36,28 @@ class ImageTaggingRequest(BaseModel):
 
 class ImageTaggingResponse(BaseModel):
     """Response model for image tagging"""
-    tags: List[Dict[str, Any]]  # [{"tag": "cat", "confidence": 0.95, "category": "animal"}, ...]
+
+    tags: List[
+        Dict[str, Any]
+    ]  # [{"tag": "cat", "confidence": 0.95, "category": "animal"}, ...]
     image_metadata: Optional[Dict[str, Any]] = None
     processing_info: Optional[Dict[str, Any]] = None
 
 
 class FilterGenerationRequest(BaseModel):
     """Request model for filter generation"""
+
     natural_language_query: str
     available_filters: List[Dict[str, Any]]  # List of available filter definitions
-    context: Optional[Dict[str, Any]] = None  # Additional context about the data being filtered
+    context: Optional[Dict[str, Any]] = (
+        None  # Additional context about the data being filtered
+    )
     max_filters: int = 5
 
 
 class FilterGenerationResponse(BaseModel):
     """Response model for filter generation"""
+
     generated_filters: List[Dict[str, Any]]
     explanation: str
     confidence_score: float

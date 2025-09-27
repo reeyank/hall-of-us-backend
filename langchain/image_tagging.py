@@ -9,8 +9,12 @@ import asyncio
 from typing import Dict, Any, List
 from datetime import datetime
 
-from .models import APIResponse, ImageTaggingRequest, ImageTaggingResponse, logger
+from .models import APIResponse, ImageTaggingRequest, ImageTaggingResponse
 from .wrapper import LangChainAPIWrapper
+from .logger import get_logger
+
+# Create a logger for this module
+logger = get_logger(__name__)
 
 
 class ImageTaggingAPISet:

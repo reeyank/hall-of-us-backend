@@ -13,9 +13,12 @@ from .models import (
     APIResponse,
     FilterGenerationRequest,
     FilterGenerationResponse,
-    logger,
 )
 from .wrapper import LangChainAPIWrapper
+from .logger import get_logger
+
+# Create a logger for this module
+logger = get_logger(__name__)
 
 
 class FilterGenerationAPISet:

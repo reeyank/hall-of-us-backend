@@ -1,0 +1,99 @@
+[2025-09-27 02:51:51] [[32mINFO[0m] [langchain.wrapper] OpenAI client initialized successfully
+[2025-09-27 02:51:52] [[32mINFO[0m] [langchain.wrapper] Starting API chain with inputs: {'image_url': 'https://example.com/sample-image.jpg', 'image_base64': None, 'image_path': None, 'max_tags': 5, 'confidence_threshold': 0.7, 'categories': None}
+[2025-09-27 02:51:52] [[31mERROR[0m] [langchain.wrapper] OpenAI vision API call failed: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 02:51:52] [[33mWARNING[0m] [langchain.image_tagging] OpenAI Vision API failed, falling back to stub: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 02:51:52] [[32mINFO[0m] [langchain.wrapper] API chain completed in 404.27ms
+[2025-09-27 02:51:52] [[32mINFO[0m] [langchain.wrapper] Starting API chain with inputs: {'image_url': None, 'image_base64': 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'image_path': None, 'max_tags': 3, 'confidence_threshold': 0.5, 'categories': None}
+[2025-09-27 02:51:52] [[31mERROR[0m] [langchain.wrapper] OpenAI vision API call failed: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 02:51:52] [[33mWARNING[0m] [langchain.image_tagging] OpenAI Vision API failed, falling back to stub: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 02:51:52] [[31mERROR[0m] [langchain.wrapper] API chain error: 1 validation error for ImageTaggingResponse
+tags
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+[2025-09-27 02:51:52] [[31mERROR[0m] [langchain.wrapper] API call failed: 1 validation error for ImageTaggingResponse
+tags
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+[2025-09-27 02:51:52] [[32mINFO[0m] [langchain.wrapper] Retrying API call (attempt 1/3)
+[2025-09-27 02:51:53] [[32mINFO[0m] [langchain.wrapper] Starting API chain with inputs: {'image_url': None, 'image_base64': 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'image_path': None, 'max_tags': 3, 'confidence_threshold': 0.5, 'categories': None}
+[2025-09-27 02:51:53] [[31mERROR[0m] [langchain.wrapper] OpenAI vision API call failed: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 02:51:53] [[33mWARNING[0m] [langchain.image_tagging] OpenAI Vision API failed, falling back to stub: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 02:51:53] [[31mERROR[0m] [langchain.wrapper] API chain error: 1 validation error for ImageTaggingResponse
+tags
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+[2025-09-27 02:51:53] [[31mERROR[0m] [langchain.wrapper] API call failed: 1 validation error for ImageTaggingResponse
+tags
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+[2025-09-27 02:51:53] [[32mINFO[0m] [langchain.wrapper] Retrying API call (attempt 2/3)
+[2025-09-27 02:51:55] [[32mINFO[0m] [langchain.wrapper] Starting API chain with inputs: {'image_url': None, 'image_base64': 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'image_path': None, 'max_tags': 3, 'confidence_threshold': 0.5, 'categories': None}
+[2025-09-27 02:51:55] [[31mERROR[0m] [langchain.wrapper] OpenAI vision API call failed: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 02:51:55] [[33mWARNING[0m] [langchain.image_tagging] OpenAI Vision API failed, falling back to stub: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 02:51:55] [[31mERROR[0m] [langchain.wrapper] API chain error: 1 validation error for ImageTaggingResponse
+tags
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+[2025-09-27 02:51:55] [[31mERROR[0m] [langchain.wrapper] API call failed: 1 validation error for ImageTaggingResponse
+tags
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+[2025-09-27 02:51:55] [[32mINFO[0m] [langchain.wrapper] Retrying API call (attempt 3/3)
+[2025-09-27 03:04:24] [[32mINFO[0m] [langchain.wrapper] OpenAI client initialized successfully
+[2025-09-27 03:04:24] [[32mINFO[0m] [langchain.wrapper] Starting API chain with inputs: {'image_url': 'https://example.com/sample-image.jpg', 'image_base64': None, 'image_path': None, 'max_tags': 5, 'confidence_threshold': 0.7, 'categories': None}
+[2025-09-27 03:04:25] [[31mERROR[0m] [langchain.wrapper] OpenAI vision API call failed: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 03:04:25] [[33mWARNING[0m] [langchain.image_tagging] OpenAI Vision API failed, falling back to stub: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 03:04:25] [[32mINFO[0m] [langchain.wrapper] API chain completed in 521.90ms
+[2025-09-27 03:04:25] [[32mINFO[0m] [langchain.wrapper] Starting API chain with inputs: {'image_url': None, 'image_base64': 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'image_path': None, 'max_tags': 3, 'confidence_threshold': 0.5, 'categories': None}
+[2025-09-27 03:04:25] [[31mERROR[0m] [langchain.wrapper] OpenAI vision API call failed: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 03:04:25] [[33mWARNING[0m] [langchain.image_tagging] OpenAI Vision API failed, falling back to stub: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 03:04:25] [[31mERROR[0m] [langchain.wrapper] API chain error: 1 validation error for ImageTaggingResponse
+tags
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+[2025-09-27 03:04:25] [[31mERROR[0m] [langchain.wrapper] API call failed: 1 validation error for ImageTaggingResponse
+tags
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+[2025-09-27 03:04:25] [[32mINFO[0m] [langchain.wrapper] Retrying API call (attempt 1/3)
+[2025-09-27 03:04:26] [[32mINFO[0m] [langchain.wrapper] Starting API chain with inputs: {'image_url': None, 'image_base64': 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'image_path': None, 'max_tags': 3, 'confidence_threshold': 0.5, 'categories': None}
+[2025-09-27 03:04:26] [[31mERROR[0m] [langchain.wrapper] OpenAI vision API call failed: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 03:04:26] [[33mWARNING[0m] [langchain.image_tagging] OpenAI Vision API failed, falling back to stub: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 03:04:26] [[31mERROR[0m] [langchain.wrapper] API chain error: 1 validation error for ImageTaggingResponse
+tags
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+[2025-09-27 03:04:26] [[31mERROR[0m] [langchain.wrapper] API call failed: 1 validation error for ImageTaggingResponse
+tags
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+[2025-09-27 03:04:26] [[32mINFO[0m] [langchain.wrapper] Retrying API call (attempt 2/3)
+[2025-09-27 03:04:28] [[32mINFO[0m] [langchain.wrapper] Starting API chain with inputs: {'image_url': None, 'image_base64': 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'image_path': None, 'max_tags': 3, 'confidence_threshold': 0.5, 'categories': None}
+[2025-09-27 03:04:28] [[31mERROR[0m] [langchain.wrapper] OpenAI vision API call failed: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 03:04:28] [[33mWARNING[0m] [langchain.image_tagging] OpenAI Vision API failed, falling back to stub: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 03:04:28] [[31mERROR[0m] [langchain.wrapper] API chain error: 1 validation error for ImageTaggingResponse
+tags
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+[2025-09-27 03:04:28] [[31mERROR[0m] [langchain.wrapper] API call failed: 1 validation error for ImageTaggingResponse
+tags
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+[2025-09-27 03:04:28] [[32mINFO[0m] [langchain.wrapper] Retrying API call (attempt 3/3)
+[2025-09-27 03:04:32] [[32mINFO[0m] [langchain.wrapper] Starting API chain with inputs: {'image_url': None, 'image_base64': 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==', 'image_path': None, 'max_tags': 3, 'confidence_threshold': 0.5, 'categories': None}
+[2025-09-27 03:04:33] [[31mERROR[0m] [langchain.wrapper] OpenAI vision API call failed: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 03:04:33] [[33mWARNING[0m] [langchain.image_tagging] OpenAI Vision API failed, falling back to stub: Error code: 404 - {'error': {'message': 'The model `gpt-4-vision-preview` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+[2025-09-27 03:04:33] [[31mERROR[0m] [langchain.wrapper] API chain error: 1 validation error for ImageTaggingResponse
+tags
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+[2025-09-27 03:04:33] [[31mERROR[0m] [langchain.wrapper] API call failed: 1 validation error for ImageTaggingResponse
+tags
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.11/v/missing
+[2025-09-27 03:04:33] [[32mINFO[0m] [langchain.wrapper] Starting API chain with inputs: {'natural_language_query': 'Show me recent popular items in technology category', 'available_filters': [{'field': 'created_at', 'type': 'date', 'operators': ['>=', '<=', '=='], 'display_name': 'Creation Date'}, {'field': 'popularity_score', 'type': 'numeric', 'operators': ['>=', '<=', '=='], 'display_name': 'Popularity Score'}, {'field': 'category', 'type': 'categorical', 'operators': ['in', '==', '!='], 'display_name': 'Category', 'values': ['technology', 'science', 'art', 'music', 'sports']}, {'field': 'title', 'type': 'text', 'operators': ['contains', '==', 'startswith'], 'display_name': 'Title'}, {'field': 'tags', 'type': 'array', 'operators': ['contains_any', 'contains_all'], 'display_name': 'Tags'}], 'context': None, 'max_filters': 3}
+[2025-09-27 03:04:34] [[32mINFO[0m] [langchain.wrapper] API chain completed in 1709.16ms
+[2025-09-27 03:04:34] [[32mINFO[0m] [langchain.wrapper] Starting API chain with inputs: {'natural_language_query': 'Find trending music content from the last month', 'available_filters': [{'field': 'created_at', 'type': 'date', 'operators': ['>=', '<=', '=='], 'display_name': 'Creation Date'}, {'field': 'popularity_score', 'type': 'numeric', 'operators': ['>=', '<=', '=='], 'display_name': 'Popularity Score'}, {'field': 'category', 'type': 'categorical', 'operators': ['in', '==', '!='], 'display_name': 'Category', 'values': ['technology', 'science', 'art', 'music', 'sports']}, {'field': 'title', 'type': 'text', 'operators': ['contains', '==', 'startswith'], 'display_name': 'Title'}, {'field': 'tags', 'type': 'array', 'operators': ['contains_any', 'contains_all'], 'display_name': 'Tags'}], 'context': None, 'max_filters': 4}
+[2025-09-27 03:04:36] [[32mINFO[0m] [langchain.wrapper] API chain completed in 2044.45ms
+[2025-09-27 03:04:36] [[32mINFO[0m] [langchain.wrapper] Starting API chain with inputs: {'filters': [{'type': 'date_range', 'field': 'created_at', 'operator': '>=', 'value': '2024-01-01'}, {'type': 'categorical', 'field': 'category', 'operator': '==', 'value': 'technology'}, {'type': 'text_search', 'field': 'description', 'operator': 'contains', 'value': 'test'}], 'available_filters': [{'field': 'created_at', 'type': 'date'}, {'field': 'category', 'type': 'categorical'}, {'field': 'popularity_score', 'type': 'numeric'}]}
+[2025-09-27 03:04:36] [[32mINFO[0m] [langchain.wrapper] API chain completed in 102.25ms

@@ -7,14 +7,17 @@ Now includes OpenAI integration for LLM and Vision API calls.
 """
 
 import sys
-import logging
 import os
 from dotenv import load_dotenv
 from typing import Any, Dict, List, Optional, Callable
 from datetime import datetime
 import asyncio
 
-from .models import APIResponse, logger
+from .models import APIResponse
+from .logger import get_logger
+
+# Create a logger for this module
+logger = get_logger(__name__)
 
 # OpenAI integration
 try:
@@ -44,6 +47,7 @@ except ImportError:
         sys.exit(1)
 
 import langchain
+
 langchain.verbose = False
 langchain.debug = False
 langchain.llm_cache = False
