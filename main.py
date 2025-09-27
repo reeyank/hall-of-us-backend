@@ -313,7 +313,7 @@ async def unlike_photo(photo_id: str, user_id: str):
 
         # Remove like and decrement count
         cur.execute("DELETE FROM photo_likes WHERE photo_id = %s AND user_id = %s", (photo_id, user_id))
-        cur.execute("UPDATE photos SET likes = likes - 1 WHERE id = %s", (photo_id))
+        cur.execute("UPDATE photos SET likes = likes - 1 WHERE id = %s", (photo_id,))
         conn.commit()
         return {"message": "Photo unliked successfully", "photo_id": photo_id, "user_id": user_id}
     except psycopg2.Error as e:
