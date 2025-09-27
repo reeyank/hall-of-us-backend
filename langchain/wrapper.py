@@ -8,6 +8,7 @@ Now includes OpenAI integration for LLM and Vision API calls.
 
 import logging
 import os
+from dotenv import load_dotenv
 from typing import Any, Dict, List, Optional, Callable
 from datetime import datetime
 import asyncio
@@ -143,6 +144,7 @@ class LangChainAPIWrapper:
         self.callback_handler = APICallbackHandler()
 
         # Initialize OpenAI client
+        load_dotenv()  # Load environment variables from .env file
         api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
         if OPENAI_AVAILABLE and api_key:
             self.openai_client = AsyncOpenAI(api_key=api_key)
@@ -213,7 +215,7 @@ class LangChainAPIWrapper:
         prompt: str,
         image_url: Optional[str] = None,
         image_base64: Optional[str] = None,
-        model: str = "gpt-4-vision-preview",
+        model: str = "gpt-4o",
         max_tokens: int = 300,
         **kwargs,
     ) -> Dict[str, Any]:
@@ -233,7 +235,7 @@ class LangChainAPIWrapper:
         """
         if not self.openai_available:
             raise ValueError(
-                "OpenAI client not available. Check API key and installation."
+                "OpenAI Vision client not available. Check API key and installation."
             )
 
         if not image_url and not image_base64:
