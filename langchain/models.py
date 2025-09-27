@@ -13,6 +13,36 @@ from .logger import get_logger
 logger = get_logger(__name__)
 
 
+# Utility functions for handling failure cases across all models
+class FailureCaseHandler:
+    """Centralized handler for common failure cases across all models"""
+
+    @staticmethod
+    def log_validation_failure(
+        model_name: str, field_name: str, error_msg: str
+    ) -> None:
+        """Log validation failures consistently"""
+        logger.error(f"{model_name}.{field_name}: {error_msg}")
+
+    @staticmethod
+    def is_valid_url(url: str) -> bool:
+        """Validate URL format"""
+        return bool(url and url.startswith(("http://", "https://")))
+
+    @staticmethod
+    def is_valid_base64(base64_str: str) -> bool:
+        """Validate base64 string format"""
+        if not base64_str:
+            return False
+        try:
+            import base64
+
+            base64.b64decode(base64_str, validate=True)
+            return True
+        except Exception:
+            return False
+
+
 class APIResponse(BaseModel):
     """Standardized API response format"""
 
@@ -21,6 +51,48 @@ class APIResponse(BaseModel):
     error: Optional[str] = None
     timestamp: datetime
     execution_time_ms: Optional[float] = None
+
+    @classmethod
+    def create_api_key_missing_failure(
+        cls, timestamp: datetime, execution_time_ms: float = 50.0
+    ) -> "APIResponse":
+        """Create failure response for missing API key case"""
+        logger.error("API key missing failure case triggered")
+        return cls(
+            success=False,
+            data=None,
+            error="OpenAI API key not provided. Set OPENAI_API_KEY environment variable.",
+            timestamp=timestamp,
+            execution_time_ms=execution_time_ms,
+        )
+
+    @classmethod
+    def create_rate_limited_failure(
+        cls, timestamp: datetime, execution_time_ms: float = 2000.0
+    ) -> "APIResponse":
+        """Create failure response for rate limiting case"""
+        logger.warning("Rate limit exceeded failure case triggered")
+        return cls(
+            success=False,
+            data=None,
+            error="Rate limit exceeded. Please try again in 60 seconds.",
+            timestamp=timestamp,
+            execution_time_ms=execution_time_ms,
+        )
+
+    @classmethod
+    def create_invalid_input_failure(
+        cls, timestamp: datetime, execution_time_ms: float = 25.0
+    ) -> "APIResponse":
+        """Create failure response for invalid input case"""
+        logger.error("Invalid input failure case triggered")
+        return cls(
+            success=False,
+            data=None,
+            error="Neither image_url nor image_base64 provided. At least one is required.",
+            timestamp=timestamp,
+            execution_time_ms=execution_time_ms,
+        )
 
     model_config = {
         "json_schema_extra": {
@@ -84,6 +156,45 @@ class ImageTaggingRequest(BaseModel):
     confidence_threshold: float = 0.5
     categories: Optional[List[str]] = None  # Specific categories to focus on
 
+    def validate_no_image_source_failure(self) -> bool:
+        """Check for no image source failure case"""
+        has_source = any([self.image_url, self.image_base64, self.image_path])
+        if not has_source:
+            logger.error(
+                "No image source failure case: no image_url, image_base64, or image_path provided"
+            )
+            return False
+        return True
+
+    def validate_bad_url_failure(self) -> bool:
+        """Check for bad URL failure case"""
+        if self.image_url and not FailureCaseHandler.is_valid_url(self.image_url):
+            logger.error(f"Bad URL failure case: malformed URL '{self.image_url}'")
+            return False
+        return True
+
+    def validate_bad_parameters_failure(self) -> bool:
+        """Check for bad parameters failure case"""
+        if self.max_tags < 0:
+            logger.error(
+                f"Bad parameters failure case: max_tags cannot be negative ({self.max_tags})"
+            )
+            return False
+        if self.confidence_threshold < 0.0 or self.confidence_threshold > 1.0:
+            logger.error(
+                f"Bad parameters failure case: confidence_threshold must be between 0.0 and 1.0 ({self.confidence_threshold})"
+            )
+            return False
+        return True
+
+    def validate_all_failure_cases(self) -> bool:
+        """Validate all documented failure cases"""
+        return (
+            self.validate_no_image_source_failure()
+            and self.validate_bad_url_failure()
+            and self.validate_bad_parameters_failure()
+        )
+
     model_config = {
         "json_schema_extra": {
             "examples": [
@@ -142,6 +253,59 @@ class ImageTaggingResponse(BaseModel):
     ]  # [{"tag": "cat", "confidence": 0.95, "category": "animal"}, ...]
     image_metadata: Optional[Dict[str, Any]] = None
     processing_info: Optional[Dict[str, Any]] = None
+
+    @classmethod
+    def create_empty_tags_low_confidence_response(
+        cls, confidence_threshold: float, metadata: Optional[Dict[str, Any]] = None
+    ) -> "ImageTaggingResponse":
+        """Create response for empty tags due to low confidence failure case"""
+        logger.warning(
+            f"Empty tags low confidence case: no tags above threshold {confidence_threshold}"
+        )
+        return cls(
+            tags=[],
+            image_metadata=metadata
+            or {"width": 100, "height": 100, "format": "PNG", "size_bytes": 1024},
+            processing_info={
+                "model_used": "gpt-4o",
+                "processing_time_ms": 1850,
+                "reason": f"No tags found above confidence threshold of {confidence_threshold}",
+            },
+        )
+
+    @classmethod
+    def create_partial_failure_response(
+        cls, low_confidence_tags: List[Dict[str, Any]], warnings: List[str]
+    ) -> "ImageTaggingResponse":
+        """Create response for partial failure case with warnings"""
+        logger.warning(f"Partial failure case with warnings: {warnings}")
+        return cls(
+            tags=low_confidence_tags,
+            image_metadata={
+                "width": 50,
+                "height": 50,
+                "format": "GIF",
+                "size_bytes": 512,
+            },
+            processing_info={
+                "model_used": "gpt-4o",
+                "processing_time_ms": 3200,
+                "warnings": warnings,
+            },
+        )
+
+    def has_quality_issues(self) -> bool:
+        """Check if response indicates quality issues"""
+        if self.processing_info and "warnings" in self.processing_info:
+            quality_warnings = [
+                "Image resolution too low",
+                "Poor image quality detected",
+            ]
+            return any(
+                warning in self.processing_info["warnings"]
+                for warning in quality_warnings
+            )
+        return False
 
     model_config = {
         "json_schema_extra": {
@@ -232,6 +396,39 @@ class FilterGenerationRequest(BaseModel):
     )
     max_filters: int = 5
 
+    def validate_empty_query_failure(self) -> bool:
+        """Check for empty query failure case"""
+        if not self.natural_language_query or self.natural_language_query.strip() == "":
+            logger.error("Empty query failure case: natural_language_query is empty")
+            return False
+        return True
+
+    def validate_no_available_filters_failure(self) -> bool:
+        """Check for no available filters failure case"""
+        if not self.available_filters or len(self.available_filters) == 0:
+            logger.error(
+                "No available filters failure case: available_filters list is empty"
+            )
+            return False
+        return True
+
+    def validate_bad_parameters_failure(self) -> bool:
+        """Check for bad parameters failure case"""
+        if self.max_filters <= 0:
+            logger.error(
+                f"Bad parameters failure case: max_filters must be positive ({self.max_filters})"
+            )
+            return False
+        return True
+
+    def validate_all_failure_cases(self) -> bool:
+        """Validate all documented failure cases"""
+        return (
+            self.validate_empty_query_failure()
+            and self.validate_no_available_filters_failure()
+            and self.validate_bad_parameters_failure()
+        )
+
     model_config = {
         "json_schema_extra": {
             "examples": [
@@ -317,6 +514,48 @@ class FilterGenerationResponse(BaseModel):
     explanation: str
     confidence_score: float
     alternative_suggestions: Optional[List[Dict[str, Any]]] = None
+
+    @classmethod
+    def create_partial_match_response(
+        cls,
+        partial_filters: List[Dict[str, Any]],
+        reason: str,
+        alternatives: Optional[List[Dict[str, Any]]] = None,
+    ) -> "FilterGenerationResponse":
+        """Create response for partial match failure case"""
+        logger.warning(f"Partial match case: {reason}")
+        return cls(
+            generated_filters=partial_filters,
+            explanation=f"I could identify some filters, but {reason}",
+            confidence_score=0.65,
+            alternative_suggestions=alternatives or [],
+        )
+
+    @classmethod
+    def create_low_confidence_response(
+        cls, reason: str = "query was too ambiguous"
+    ) -> "FilterGenerationResponse":
+        """Create response for low confidence failure case"""
+        logger.warning(f"Low confidence case: {reason}")
+        return cls(
+            generated_filters=[],
+            explanation=f"The {reason} to generate specific filters. Please provide more specific criteria.",
+            confidence_score=0.25,
+            alternative_suggestions=[
+                {
+                    "suggestion": "Try specifying exact field names or values",
+                    "example": "Instead of 'good products', try 'products with rating > 4'",
+                }
+            ],
+        )
+
+    def is_low_confidence(self, threshold: float = 0.5) -> bool:
+        """Check if response has low confidence"""
+        return self.confidence_score < threshold
+
+    def has_partial_results(self) -> bool:
+        """Check if response has partial results (some filters but low confidence)"""
+        return len(self.generated_filters) > 0 and self.confidence_score < 0.8
 
     model_config = {
         "json_schema_extra": {
