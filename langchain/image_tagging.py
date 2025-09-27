@@ -85,7 +85,7 @@ class ImageTaggingAPISet:
             openai_response = await self.wrapper.call_openai_vision(
                 prompt=prompt,
                 image_url=inputs.get("image_url"),
-                model="gpt-4-vision-preview",
+                model="gpt-4o",
                 max_tokens=500,
             )
 
@@ -139,7 +139,7 @@ class ImageTaggingAPISet:
             openai_response = await self.wrapper.call_openai_vision(
                 prompt=prompt,
                 image_base64=inputs.get("image_base64"),
-                model="gpt-4-vision-preview",
+                model="gpt-4o",
                 max_tokens=500,
             )
 
