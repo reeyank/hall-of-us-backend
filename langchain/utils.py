@@ -15,7 +15,7 @@ def validate_image_format(filename: str) -> bool:
     """Validate if the image format is supported"""
     if not filename:
         return False
-    
+
     ext = filename.lower().split('.')[-1]
     return ext in CONFIG["image_tagging"]["supported_formats"]
 
@@ -76,7 +76,7 @@ def format_execution_time(execution_time_ms: Optional[float]) -> str:
     """Format execution time for display"""
     if execution_time_ms is None:
         return "N/A"
-    
+
     if execution_time_ms < 1000:
         return f"{execution_time_ms:.2f}ms"
     else:
