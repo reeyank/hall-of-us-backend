@@ -76,99 +76,80 @@ class ImageTaggingAPISet:
     ) -> ImageTaggingResponse:
         """Process image from URL using OpenAI Vision API"""
 
-        # Try to use OpenAI Vision API if available
+        # Use OpenAI Vision API
         assert self.wrapper.openai_available is not None
 
-        try:
-            prompt = self._build_tagging_prompt(inputs)
+        prompt = self._build_tagging_prompt(inputs)
 
-            openai_response = await self.wrapper.call_openai_vision(
-                prompt=prompt,
-                image_url=inputs.get("image_url"),
-                model="gpt-4o",
-                max_tokens=500,
-            )
+        openai_response = await self.wrapper.call_openai_vision(
+            prompt=prompt,
+            image_url=inputs.get("image_url"),
+            model="gpt-4o",
+            max_tokens=500,
+        )
 
-            # Parse OpenAI response into structured tags
-            tags = self._parse_openai_tags_response(
-                openai_response["content"],
-                inputs.get("max_tags", 10),
-                inputs.get("confidence_threshold", 0.5),
-            )
+        # Parse OpenAI response into structured tags
+        tags = self._parse_openai_tags_response(
+            openai_response["content"],
+            inputs.get("max_tags", 10),
+            inputs.get("confidence_threshold", 0.5),
+        )
 
-            return ImageTaggingResponse(
-                tags=tags,
-                image_metadata={
-                    "source": "url",
-                    "url": inputs.get("image_url"),
-                    "processed_at": datetime.now().isoformat(),
-                    "model_used": openai_response["model"],
-                },
-                processing_info={
-                    "model": openai_response["model"],
-                    "confidence_threshold": inputs.get("confidence_threshold", 0.5),
-                    "tokens_used": openai_response["usage"]["total_tokens"],
-                    "method": "openai_vision",
-                },
-            )
-
-        except Exception as e:
-            logger.warning(f"OpenAI Vision API failed, falling back to stub: {str(e)}")
-            return ImageTaggingResponse(
-                tags=[],
-                image_metadata={
-                    "error": str(e),
-                },
-                processing_info={
-                    "error": str(e),
-                    "method": "openai_vision",
-                },
-            )
-            # Fall through to stub implementation
+        return ImageTaggingResponse(
+            tags=tags,
+            image_metadata={
+                "source": "url",
+                "url": inputs.get("image_url"),
+                "processed_at": datetime.now().isoformat(),
+                "model_used": openai_response["model"],
+            },
+            processing_info={
+                "model": openai_response["model"],
+                "confidence_threshold": inputs.get("confidence_threshold", 0.5),
+                "tokens_used": openai_response["usage"]["total_tokens"],
+                "method": "openai_vision",
+            },
+        )
 
     async def _process_image_base64_tagging(
         self, inputs: Dict[str, Any]
     ) -> ImageTaggingResponse:
         """Process image from base64 using OpenAI Vision API"""
 
-        # Try to use OpenAI Vision API if available
+        # Use OpenAI Vision API
         assert self.wrapper.openai_available is not None
-        try:
-            prompt = self._build_tagging_prompt(inputs)
 
-            openai_response = await self.wrapper.call_openai_vision(
-                prompt=prompt,
-                image_base64=inputs.get("image_base64"),
-                model="gpt-4o",
-                max_tokens=500,
-            )
+        prompt = self._build_tagging_prompt(inputs)
 
-            # Parse OpenAI response into structured tags
-            tags = self._parse_openai_tags_response(
-                openai_response["content"],
-                inputs.get("max_tags", 10),
-                inputs.get("confidence_threshold", 0.5),
-            )
+        openai_response = await self.wrapper.call_openai_vision(
+            prompt=prompt,
+            image_base64=inputs.get("image_base64"),
+            model="gpt-4o",
+            max_tokens=500,
+        )
 
-            return ImageTaggingResponse(
-                tags=tags,
-                image_metadata={
-                    "source": "base64",
-                    "size_bytes": len(inputs.get("image_base64", "")),
-                    "processed_at": datetime.now().isoformat(),
-                    "model_used": openai_response["model"],
-                },
-                processing_info={
-                    "model": openai_response["model"],
-                    "confidence_threshold": inputs.get("confidence_threshold", 0.5),
-                    "tokens_used": openai_response["usage"]["total_tokens"],
-                    "method": "openai_vision",
-                },
-            )
+        # Parse OpenAI response into structured tags
+        tags = self._parse_openai_tags_response(
+            openai_response["content"],
+            inputs.get("max_tags", 10),
+            inputs.get("confidence_threshold", 0.5),
+        )
 
-        except Exception as e:
-            logger.warning(f"OpenAI Vision API failed, falling back to stub: {str(e)}")
-            return ImageTaggingResponse()
+        return ImageTaggingResponse(
+            tags=tags,
+            image_metadata={
+                "source": "base64",
+                "size_bytes": len(inputs.get("image_base64", "")),
+                "processed_at": datetime.now().isoformat(),
+                "model_used": openai_response["model"],
+            },
+            processing_info={
+                "model": openai_response["model"],
+                "confidence_threshold": inputs.get("confidence_threshold", 0.5),
+                "tokens_used": openai_response["usage"]["total_tokens"],
+                "method": "openai_vision",
+            },
+        )
 
     async def _process_image_file_tagging(
         self, inputs: Dict[str, Any]
@@ -232,113 +213,28 @@ Format your response as a JSON array of objects like this:
         import json
         import re
 
-        try:
-            # Try to extract JSON from the response
-            json_match = re.search(r"\[.*\]", response_content, re.DOTALL)
-            if json_match:
-                json_str = json_match.group()
-                tags_data = json.loads(json_str)
+        # Extract JSON from the response
+        json_match = re.search(r"\[.*\]", response_content, re.DOTALL)
+        json_str = json_match.group()
+        tags_data = json.loads(json_str)
 
-                # Filter and validate tags
-                valid_tags = []
-                for tag_data in tags_data:
-                    if (
-                        isinstance(tag_data, dict)
-                        and "tag" in tag_data
-                        and "confidence" in tag_data
-                        and tag_data.get("confidence", 0) >= confidence_threshold
-                    ):
-                        valid_tags.append(
-                            {
-                                "tag": str(tag_data["tag"]).lower().strip(),
-                                "confidence": float(tag_data["confidence"]),
-                                "category": tag_data.get("category", "general"),
-                            }
-                        )
-
-                # Sort by confidence and limit results
-                valid_tags.sort(key=lambda x: x["confidence"], reverse=True)
-                return valid_tags[:max_tags]
-
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
-            logger.warning(f"Failed to parse OpenAI response as JSON: {e}")
-
-        # Fallback: try to extract tags from natural language response
-        return self._extract_tags_from_text(
-            response_content, max_tags, confidence_threshold
-        )
-
-    def _extract_tags_from_text(
-        self, text: str, max_tags: int, confidence_threshold: float
-    ) -> List[Dict[str, Any]]:
-        """Extract tags from natural language text as fallback"""
-        import re
-
-        # Simple extraction - look for potential tag words
-        words = re.findall(r"\b[a-zA-Z]{3,}\b", text.lower())
-
-        # Filter common words and create tags
-        common_words = {
-            "the",
-            "and",
-            "for",
-            "are",
-            "but",
-            "not",
-            "you",
-            "all",
-            "can",
-            "had",
-            "her",
-            "was",
-            "one",
-            "our",
-            "out",
-            "day",
-            "get",
-            "has",
-            "him",
-            "his",
-            "how",
-            "its",
-            "may",
-            "new",
-            "now",
-            "old",
-            "see",
-            "two",
-            "way",
-            "who",
-            "boy",
-            "did",
-            "she",
-            "use",
-            "her",
-            "now",
-            "find",
-            "long",
-            "down",
-            "side",
-            "been",
-            "call",
-            "come",
-        }
-
-        potential_tags = [
-            word for word in set(words) if len(word) > 3 and word not in common_words
-        ]
-
-        # Create tag objects with estimated confidence
-        tags = []
-        for i, tag in enumerate(potential_tags[:max_tags]):
-            confidence = max(0.5, 0.9 - (i * 0.1))  # Decreasing confidence
-            if confidence >= confidence_threshold:
-                tags.append(
+        # Filter and validate tags
+        valid_tags = []
+        for tag_data in tags_data:
+            if (
+                isinstance(tag_data, dict)
+                and "tag" in tag_data
+                and "confidence" in tag_data
+                and tag_data.get("confidence", 0) >= confidence_threshold
+            ):
+                valid_tags.append(
                     {
-                        "tag": tag,
-                        "confidence": round(confidence, 2),
-                        "category": "extracted",
+                        "tag": str(tag_data["tag"]).lower().strip(),
+                        "confidence": float(tag_data["confidence"]),
+                        "category": tag_data.get("category", "general"),
                     }
                 )
 
-        return tags
+        # Sort by confidence and limit results
+        valid_tags.sort(key=lambda x: x["confidence"], reverse=True)
+        return valid_tags[:max_tags]
