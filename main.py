@@ -11,6 +11,9 @@ from datetime import datetime
 from dotenv import load_dotenv
 import json # Re-introduce the json module
 from pydantic import BaseModel # Import BaseModel
+from PIL import Image, ImageDraw, ImageFont # Import Pillow components
+from io import BytesIO # Import BytesIO
+from fastapi.responses import Response # Import Response
 
 load_dotenv()
 
@@ -24,6 +27,15 @@ DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
+
+def convert_dms_to_decimal(dms, ref):
+    degrees = dms[0]
+    minutes = dms[1]
+    seconds = dms[2]
+    decimal_degrees = degrees + (minutes / 60) + (seconds / 3600)
+    if ref in ['S', 'W']:
+        decimal_degrees *= -1
+    return decimal_degrees
 
 # Function to get a database connection
 def get_db_connection():
@@ -61,7 +73,8 @@ def initialize_db():
                 upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 tags TEXT DEFAULT '',
                 user_id VARCHAR(255) DEFAULT NULL,
-                likes INTEGER DEFAULT 0
+                likes INTEGER DEFAULT 0,
+                caption TEXT DEFAULT NULL
             );
             CREATE TABLE IF NOT EXISTS users (
                 username VARCHAR(255) PRIMARY KEY,
@@ -81,6 +94,7 @@ def initialize_db():
         cur.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS user_id VARCHAR(255) DEFAULT NULL;")
         cur.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0;")
         cur.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS exif_gps_info TEXT DEFAULT NULL;")
+        cur.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS caption TEXT DEFAULT NULL;")
         conn.commit()
         print("Database table 'photos' initialized successfully.")
     except psycopg2.Error as e:
@@ -114,7 +128,8 @@ async def read_root():
 async def upload_photo(
     file: UploadFile = File(...),
     tags: str = Form(''), # Optional tags as a comma-separated string
-    user_id: str = Form(None) # Optional user ID
+    user_id: str = Form(None), # Optional user ID
+    caption: str = Form(None) # Optional caption
 ):
     if not file:
         raise HTTPException(status_code=400, detail="No file provided")
@@ -145,8 +160,8 @@ async def upload_photo(
         cur = conn.cursor()
         try:
             cur.execute(
-                "INSERT INTO photos (id, filename, url, tags, user_id, likes, exif_gps_info) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                (uuid_photo, file.filename, public_url, tags, user_id, 0, exif_gps_info)
+                "INSERT INTO photos (id, filename, url, tags, user_id, likes, exif_gps_info, caption) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (uuid_photo, file.filename, public_url, tags, user_id, 0, exif_gps_info, caption)
             )
             conn.commit()
         except psycopg2.Error as e:
@@ -157,7 +172,7 @@ async def upload_photo(
             conn.close()
         
         print(f"UUID: {uuid_photo_with_extension}")
-        return {"id": uuid_photo, "filename": file.filename, "url": public_url, "tags": tags, "user_id": user_id, "likes": 0, "exif_gps_info": json.loads(exif_gps_info) if exif_gps_info else None}
+        return {"id": uuid_photo, "filename": file.filename, "url": public_url, "tags": tags, "user_id": user_id, "likes": 0, "exif_gps_info": json.loads(exif_gps_info) if exif_gps_info else None, "caption": caption}
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
@@ -169,7 +184,7 @@ async def get_photo(image_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info FROM photos WHERE id = %s", (image_id,))
+        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption FROM photos WHERE id = %s", (image_id,))
         photo = cur.fetchone()
         if photo:
             return {
@@ -179,7 +194,8 @@ async def get_photo(image_id: str):
                 "tags": photo[3],
                 "user_id": photo[4],
                 "likes": photo[5],
-                "exif_gps_info": json.loads(photo[6]) if photo[6] else None
+                "exif_gps_info": json.loads(photo[6]) if photo[6] else None,
+                "caption": photo[7]
             }
         else:
             raise HTTPException(status_code=404, detail="Image not found in database")
@@ -194,7 +210,7 @@ async def get_all_photos():
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info FROM photos")
+        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption FROM photos")
         rows = cur.fetchall()
         columns = [col[0] for col in cur.description]
         photos = []
@@ -206,7 +222,8 @@ async def get_all_photos():
                 "tags": row[3],
                 "user_id": row[4],
                 "likes": row[5],
-                "exif_gps_info": json.loads(row[6]) if row[6] else None
+                "exif_gps_info": json.loads(row[6]) if row[6] else None,
+                "caption": row[7]
             })
         return {"photos": photos}
     except psycopg2.Error as e:
@@ -220,7 +237,7 @@ async def get_photos_by_user(user_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info FROM photos WHERE user_id = %s", (user_id,))
+        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption FROM photos WHERE user_id = %s", (user_id,))
         rows = cur.fetchall()
         columns = [col[0] for col in cur.description]
         photos = []
@@ -232,7 +249,8 @@ async def get_photos_by_user(user_id: str):
                 "tags": row[3],
                 "user_id": row[4],
                 "likes": row[5],
-                "exif_gps_info": json.loads(row[6]) if row[6] else None
+                "exif_gps_info": json.loads(row[6]) if row[6] else None,
+                "caption": row[7]
             })
         return {"photos": photos}
     except psycopg2.Error as e:
@@ -295,7 +313,7 @@ async def unlike_photo(photo_id: str, user_id: str = Form(...)):
 
         # Remove like and decrement count
         cur.execute("DELETE FROM photo_likes WHERE photo_id = %s AND user_id = %s", (photo_id, user_id))
-        cur.execute("UPDATE photos SET likes = likes - 1 WHERE id = %s", (photo_id,))
+        cur.execute("UPDATE photos SET likes = likes - 1 WHERE id = %s", (photo_id))
         conn.commit()
         return {"message": "Photo unliked successfully", "photo_id": photo_id, "user_id": user_id}
     except psycopg2.Error as e:
@@ -304,6 +322,74 @@ async def unlike_photo(photo_id: str, user_id: str = Form(...)):
     finally:
         cur.close()
         conn.close()
+
+@app.get("/gps")
+async def get_all_photos_gps_data():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id, exif_gps_info FROM photos WHERE exif_gps_info IS NOT NULL")
+        rows = cur.fetchall()
+        gps_data_list = []
+        for row in rows:
+            photo_id = row[0]
+            exif_gps_info_str = row[1]
+            try:
+                gps_info = json.loads(exif_gps_info_str)
+                
+                latitude_dms = gps_info.get("2") # Key "2" for latitude DMS
+                latitude_ref = gps_info.get("1") # Key "1" for latitude reference
+                longitude_dms = gps_info.get("4") # Key "4" for longitude DMS
+                longitude_ref = gps_info.get("3") # Key "3" for longitude reference
+
+                if latitude_dms and latitude_ref and longitude_dms and longitude_ref:
+                    latitude = convert_dms_to_decimal(latitude_dms, latitude_ref)
+                    longitude = convert_dms_to_decimal(longitude_dms, longitude_ref)
+                    gps_data_list.append({
+                        "photo_id": photo_id,
+                        "latitude": latitude,
+                        "longitude": longitude
+                    })
+            except json.JSONDecodeError:
+                print(f"Warning: Could not decode JSON for photo_id {photo_id}")
+                continue # Skip this entry if JSON is malformed
+        return {"gps_data": gps_data_list}
+    except psycopg2.Error as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+@app.get("/plaque_text")
+async def get_image_with_text(text: str = "Hello, World!"):
+    img_width = 800
+    img_height = 400
+    background_color = (139, 69, 19)  # Brown color (RGB)
+    text_color = (255, 255, 255)  # White color (RGB)
+
+    img = Image.new('RGB', (img_width, img_height), color=background_color)
+    d = ImageDraw.Draw(img)
+
+    try:
+        font = ImageFont.truetype("./TheSeasons.otf", 40)
+    except IOError:
+        font = ImageFont.load_default() # Fallback to default font
+
+    # Calculate text size and position
+    text_bbox = d.textbbox((0,0), text, font=font)
+    text_width = text_bbox[2] - text_bbox[0]
+    text_height = text_bbox[3] - text_bbox[1]
+    
+    x = (img_width - text_width) / 2
+    y = (img_height - text_height) / 2
+
+    d.text((x, y), text, fill=text_color, font=font)
+
+    img_byte_arr = BytesIO()
+    img.save(img_byte_arr, format='PNG')
+    img_byte_arr.seek(0)
+
+    return Response(content=img_byte_arr.getvalue(), media_type="image/png")
 
 @app.post("/signup")
 async def signup(user: User):
@@ -349,3 +435,4 @@ async def signin(user: User):
     finally:
         cur.close()
         conn.close()
+
