@@ -380,7 +380,6 @@ async def get_photos_by_user(user_id: str):
     finally:
         cur.close()
         conn.close()
-<<<<<<< HEAD
 
 @app.post("/photos/{photo_id}/like")
 async def like_photo(photo_id: str, user_id: str):
