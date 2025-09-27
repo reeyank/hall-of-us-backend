@@ -260,7 +260,7 @@ async def get_photos_by_user(user_id: str):
         conn.close()
 
 @app.post("/photos/{photo_id}/like")
-async def like_photo(photo_id: str, user_id: str = Form(...)):
+async def like_photo(photo_id: str, user_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
