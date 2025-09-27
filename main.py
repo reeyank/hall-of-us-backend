@@ -95,6 +95,12 @@ def initialize_db():
         cur.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0;")
         cur.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS exif_gps_info TEXT DEFAULT NULL;")
         cur.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS caption TEXT DEFAULT NULL;")
+
+        # Modify photo_likes table to allow multiple likes per user per photo
+        cur.execute("ALTER TABLE photo_likes DROP CONSTRAINT IF EXISTS photo_likes_pkey;") # Drop existing PK
+        cur.execute("ALTER TABLE photo_likes ADD COLUMN IF NOT EXISTS id SERIAL;") # Add new id column if it doesn't exist
+        cur.execute("ALTER TABLE photo_likes ADD PRIMARY KEY (id);") # Set new id as PK
+
         conn.commit()
         print("Database table 'photos' initialized successfully.")
     except psycopg2.Error as e:
@@ -210,7 +216,7 @@ async def get_all_photos():
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption FROM photos")
+        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption FROM photos ORDER BY upload_date DESC")
         rows = cur.fetchall()
         columns = [col[0] for col in cur.description]
         photos = []
@@ -307,7 +313,7 @@ async def unlike_photo(photo_id: str, user_id: str):
             raise HTTPException(status_code=400, detail="Photo not liked by this user")
 
         # Remove like and decrement count
-        cur.execute("DELETE FROM photo_likes WHERE photo_id = %s AND user_id = %s", (photo_id, user_id))
+        cur.execute("DELETE FROM photo_likes WHERE photo_id = %s AND user_id = %s LIMIT 1", (photo_id, user_id))
         cur.execute("UPDATE photos SET likes = likes - 1 WHERE id = %s", (photo_id,))
         conn.commit()
         return {"message": "Photo unliked successfully", "photo_id": photo_id, "user_id": user_id}
