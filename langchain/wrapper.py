@@ -3,14 +3,43 @@ LangChain Wrapper Component for API Calls
 
 This module provides a centralized wrapper for all API interactions using LangChain.
 It handles common concerns like error handling, retries, logging, and response formatting.
+Now includes OpenAI integration for LLM and Vision API calls.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Union, Callable
+import os
+from typing import Any, Dict, List, Optional, Callable
 from datetime import datetime
 import asyncio
 
 from .models import APIResponse, logger
+
+# OpenAI integration
+try:
+    import openai
+    from openai import AsyncOpenAI
+
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    logger.warning("OpenAI not available. Install with: pip install openai")
+
+    # Create stub client
+    class AsyncOpenAI:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        @property
+        def chat(self):
+            return self
+
+        @property
+        def completions(self):
+            return self
+
+        async def create(self, *args, **kwargs):
+            raise NotImplementedError("OpenAI not installed")
+
 
 try:
     # Try the newer LangChain imports first
@@ -27,17 +56,22 @@ except ImportError:
 
         class AsyncCallbackHandler:
             """Stub callback handler when LangChain is not available"""
+
             def __init__(self):
                 self.start_time = None
                 self.errors = []
 
-            async def on_chain_start(self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs) -> None:
+            async def on_chain_start(
+                self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs
+            ) -> None:
                 self.start_time = datetime.now()
                 logger.info(f"Starting API chain with inputs: {inputs}")
 
             async def on_chain_end(self, outputs: Dict[str, Any], **kwargs) -> None:
                 if self.start_time:
-                    execution_time = (datetime.now() - self.start_time).total_seconds() * 1000
+                    execution_time = (
+                        datetime.now() - self.start_time
+                    ).total_seconds() * 1000
                     logger.info(f"API chain completed in {execution_time:.2f}ms")
 
             async def on_chain_error(self, error: Exception, **kwargs) -> None:
@@ -46,14 +80,18 @@ except ImportError:
 
         class Runnable:
             """Stub runnable when LangChain is not available"""
+
             def __init__(self, func: Callable):
                 self.func = func
 
-            async def ainvoke(self, inputs: Dict[str, Any], config: Optional[Dict] = None) -> Any:
+            async def ainvoke(
+                self, inputs: Dict[str, Any], config: Optional[Dict] = None
+            ) -> Any:
                 return await self.func(inputs)
 
         class RunnableLambda(Runnable):
             """Stub RunnableLambda when LangChain is not available"""
+
             pass
 
 
@@ -65,7 +103,9 @@ class APICallbackHandler(AsyncCallbackHandler):
         self.start_time = None
         self.errors = []
 
-    async def on_chain_start(self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs) -> None:
+    async def on_chain_start(
+        self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs
+    ) -> None:
         self.start_time = datetime.now()
         logger.info(f"Starting API chain with inputs: {inputs}")
 
@@ -89,18 +129,154 @@ class LangChainAPIWrapper:
     - Logging and monitoring
     - Rate limiting (can be extended)
     - Caching (can be extended)
+    - OpenAI integration for LLM and Vision API calls
     """
 
-    def __init__(self, max_retries: int = 3, timeout_seconds: int = 30):
+    def __init__(
+        self,
+        max_retries: int = 3,
+        timeout_seconds: int = 30,
+        openai_api_key: Optional[str] = None,
+    ):
         self.max_retries = max_retries
         self.timeout_seconds = timeout_seconds
         self.callback_handler = APICallbackHandler()
 
-    async def execute_chain(
+        # Initialize OpenAI client
+        api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
+        if OPENAI_AVAILABLE and api_key:
+            self.openai_client = AsyncOpenAI(api_key=api_key)
+            self.openai_available = True
+            logger.info("OpenAI client initialized successfully")
+        else:
+            self.openai_client = None
+            self.openai_available = False
+            if not api_key:
+                logger.warning(
+                    "OpenAI API key not provided. Set OPENAI_API_KEY environment variable."
+                )
+            else:
+                logger.warning("OpenAI not available. Install with: pip install openai")
+
+    async def call_openai_chat(
         self,
-        chain: Runnable,
-        inputs: Dict[str, Any],
-        retry_count: int = 0
+        messages: List[Dict[str, str]],
+        model: str = "gpt-3.5-turbo",
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        Make a chat completion call to OpenAI API
+
+        Args:
+            messages: List of message dicts with 'role' and 'content'
+            model: OpenAI model to use
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            **kwargs: Additional OpenAI API parameters
+
+        Returns:
+            Dict containing the response and metadata
+        """
+        if not self.openai_available:
+            raise ValueError(
+                "OpenAI client not available. Check API key and installation."
+            )
+
+        try:
+            response = await self.openai_client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                **kwargs,
+            )
+
+            return {
+                "content": response.choices[0].message.content,
+                "model": response.model,
+                "usage": {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens,
+                },
+                "finish_reason": response.choices[0].finish_reason,
+            }
+
+        except Exception as e:
+            logger.error(f"OpenAI chat completion failed: {str(e)}")
+            raise e
+
+    async def call_openai_vision(
+        self,
+        prompt: str,
+        image_url: Optional[str] = None,
+        image_base64: Optional[str] = None,
+        model: str = "gpt-4-vision-preview",
+        max_tokens: int = 300,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        Make a vision API call to OpenAI for image analysis
+
+        Args:
+            prompt: Text prompt describing what to analyze
+            image_url: URL of the image to analyze
+            image_base64: Base64 encoded image data
+            model: OpenAI vision model to use
+            max_tokens: Maximum tokens to generate
+            **kwargs: Additional OpenAI API parameters
+
+        Returns:
+            Dict containing the response and metadata
+        """
+        if not self.openai_available:
+            raise ValueError(
+                "OpenAI client not available. Check API key and installation."
+            )
+
+        if not image_url and not image_base64:
+            raise ValueError("Either image_url or image_base64 must be provided")
+
+        # Prepare the image content
+        if image_url:
+            image_content = {"type": "image_url", "image_url": {"url": image_url}}
+        else:
+            image_content = {
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"},
+            }
+
+        messages = [
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": prompt}, image_content],
+            }
+        ]
+
+        try:
+            response = await self.openai_client.chat.completions.create(
+                model=model, messages=messages, max_tokens=max_tokens, **kwargs
+            )
+
+            return {
+                "content": response.choices[0].message.content,
+                "model": response.model,
+                "usage": {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens,
+                },
+                "finish_reason": response.choices[0].finish_reason,
+            }
+
+        except Exception as e:
+            logger.error(f"OpenAI vision API call failed: {str(e)}")
+            raise e
+
+    async def execute_chain(
+        self, chain: Runnable, inputs: Dict[str, Any], retry_count: int = 0
     ) -> APIResponse:
         """
         Execute a LangChain runnable with error handling and retries.
@@ -119,7 +295,7 @@ class LangChainAPIWrapper:
             # Execute the chain with timeout
             result = await asyncio.wait_for(
                 chain.ainvoke(inputs, config={"callbacks": [self.callback_handler]}),
-                timeout=self.timeout_seconds
+                timeout=self.timeout_seconds,
             )
 
             execution_time = (datetime.now() - start_time).total_seconds() * 1000
@@ -128,7 +304,7 @@ class LangChainAPIWrapper:
                 success=True,
                 data=result,
                 timestamp=datetime.now(),
-                execution_time_ms=execution_time
+                execution_time_ms=execution_time,
             )
 
         except asyncio.TimeoutError as e:
@@ -145,13 +321,15 @@ class LangChainAPIWrapper:
         chain: Runnable,
         inputs: Dict[str, Any],
         retry_count: int,
-        start_time: datetime
+        start_time: datetime,
     ) -> APIResponse:
         """Handle errors with retry logic"""
 
         if retry_count < self.max_retries:
-            logger.info(f"Retrying API call (attempt {retry_count + 1}/{self.max_retries})")
-            await asyncio.sleep(2 ** retry_count)  # Exponential backoff
+            logger.info(
+                f"Retrying API call (attempt {retry_count + 1}/{self.max_retries})"
+            )
+            await asyncio.sleep(2**retry_count)  # Exponential backoff
             return await self.execute_chain(chain, inputs, retry_count + 1)
 
         execution_time = (datetime.now() - start_time).total_seconds() * 1000
@@ -160,12 +338,11 @@ class LangChainAPIWrapper:
             success=False,
             error=str(error),
             timestamp=datetime.now(),
-            execution_time_ms=execution_time
+            execution_time_ms=execution_time,
         )
 
     async def batch_execute(
-        self,
-        chains_and_inputs: List[tuple[Runnable, Dict[str, Any]]]
+        self, chains_and_inputs: List[tuple[Runnable, Dict[str, Any]]]
     ) -> List[APIResponse]:
         """
         Execute multiple chains in parallel.
@@ -177,8 +354,7 @@ class LangChainAPIWrapper:
             List of APIResponse objects
         """
         tasks = [
-            self.execute_chain(chain, inputs)
-            for chain, inputs in chains_and_inputs
+            self.execute_chain(chain, inputs) for chain, inputs in chains_and_inputs
         ]
 
         return await asyncio.gather(*tasks)

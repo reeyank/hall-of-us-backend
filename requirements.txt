@@ -14,8 +14,10 @@ httpx==0.25.2
 # Image processing
 pillow==10.1.0
 
+# OpenAI integration
+openai==1.3.0
+
 # Optional: LangChain dependencies (uncomment when ready to integrate)
 # langchain==0.1.0
 # langchain-core==0.1.0
 # langchain-openai==0.0.5
-# openai==1.3.0
