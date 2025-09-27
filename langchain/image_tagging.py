@@ -6,7 +6,7 @@ This handles various image input formats and provides structured tagging respons
 """
 
 import asyncio
-from typing import Dict, Any
+from typing import Dict, Any, List
 from datetime import datetime
 
 from .models import (
