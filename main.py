@@ -4,7 +4,7 @@ from fastapi.responses import RedirectResponse
 from s3_upload import upload_file_to_s3, extract_exif_data
 import shutil
 import tempfile
-from langchain_calls import router as langchain_router
+from langchain_router import router as langchain_router
 import os
 import uuid
 import psycopg2
