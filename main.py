@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form # Import Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Depends # Import Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from s3_upload import upload_file_to_s3, extract_exif_data
@@ -10,8 +10,14 @@ import psycopg2
 from datetime import datetime
 from dotenv import load_dotenv
 import json # Re-introduce the json module
+from pydantic import BaseModel # Import BaseModel
 
 load_dotenv()
+
+# Pydantic model for User
+class User(BaseModel):
+    username: str
+    password: str
 
 DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
@@ -56,6 +62,17 @@ def initialize_db():
                 tags TEXT DEFAULT '',
                 user_id VARCHAR(255) DEFAULT NULL,
                 likes INTEGER DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS users (
+                username VARCHAR(255) PRIMARY KEY,
+                password TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS photo_likes (
+                photo_id VARCHAR(255) REFERENCES photos(id) ON DELETE CASCADE,
+                user_id VARCHAR(255) REFERENCES users(username) ON DELETE CASCADE,
+                PRIMARY KEY (photo_id, user_id),
+                liked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """
         )
@@ -218,6 +235,115 @@ async def get_photos_by_user(user_id: str):
                 "exif_gps_info": json.loads(row[6]) if row[6] else None
             })
         return {"photos": photos}
+    except psycopg2.Error as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+@app.post("/photos/{photo_id}/like")
+async def like_photo(photo_id: str, user_id: str = Form(...)):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Check if photo exists
+        cur.execute("SELECT id FROM photos WHERE id = %s", (photo_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Photo not found")
+
+        # Check if user exists
+        cur.execute("SELECT username FROM users WHERE username = %s", (user_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Check if already liked
+        cur.execute("SELECT 1 FROM photo_likes WHERE photo_id = %s AND user_id = %s", (photo_id, user_id))
+        if cur.fetchone():
+            raise HTTPException(status_code=400, detail="Photo already liked by this user")
+
+        # Add like and increment count
+        cur.execute("INSERT INTO photo_likes (photo_id, user_id) VALUES (%s, %s)", (photo_id, user_id))
+        cur.execute("UPDATE photos SET likes = likes + 1 WHERE id = %s", (photo_id,))
+        conn.commit()
+        return {"message": "Photo liked successfully", "photo_id": photo_id, "user_id": user_id}
+    except psycopg2.Error as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+@app.delete("/photos/{photo_id}/unlike")
+async def unlike_photo(photo_id: str, user_id: str = Form(...)):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Check if photo exists
+        cur.execute("SELECT id FROM photos WHERE id = %s", (photo_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Photo not found")
+
+        # Check if user exists
+        cur.execute("SELECT username FROM users WHERE username = %s", (user_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Check if liked
+        cur.execute("SELECT 1 FROM photo_likes WHERE photo_id = %s AND user_id = %s", (photo_id, user_id))
+        if not cur.fetchone():
+            raise HTTPException(status_code=400, detail="Photo not liked by this user")
+
+        # Remove like and decrement count
+        cur.execute("DELETE FROM photo_likes WHERE photo_id = %s AND user_id = %s", (photo_id, user_id))
+        cur.execute("UPDATE photos SET likes = likes - 1 WHERE id = %s", (photo_id,))
+        conn.commit()
+        return {"message": "Photo unliked successfully", "photo_id": photo_id, "user_id": user_id}
+    except psycopg2.Error as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+@app.post("/signup")
+async def signup(user: User):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        # Check if username already exists
+        cur.execute("SELECT username FROM users WHERE username = %s", (user.username,))
+        if cur.fetchone():
+            raise HTTPException(status_code=400, detail="Username already registered")
+
+        cur.execute(
+            "INSERT INTO users (username, password) VALUES (%s, %s)",
+            (user.username, user.password)
+        )
+        conn.commit()
+        return {"message": "User registered successfully", "user_id": user.username} # Assuming user_id is the username for now
+    except psycopg2.Error as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+@app.post("/signin")
+async def signin(user: User):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT password FROM users WHERE username = %s", (user.username,))
+        result = cur.fetchone()
+
+        if not result:
+            raise HTTPException(status_code=400, detail="Incorrect username or password")
+
+        stored_password = result[0]
+        if user.password == stored_password:
+            return {"message": "Signed in successfully", "user_id": user.username}
+        else:
+            raise HTTPException(status_code=400, detail="Incorrect username or password")
     except psycopg2.Error as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
     finally:
