@@ -126,6 +126,7 @@ def initialize_db():
         cur.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0;")
         cur.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS exif_gps_info TEXT DEFAULT NULL;")
         cur.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS caption TEXT DEFAULT NULL;")
+        cur.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS orientation VARCHAR(10) DEFAULT NULL;")
 
         # Modify photo_likes table to allow multiple likes per user per photo
         cur.execute("ALTER TABLE photo_likes DROP CONSTRAINT IF EXISTS photo_likes_pkey;") # Drop existing PK
@@ -176,6 +177,12 @@ async def upload_photo(
         temp_file_path = temp_file.name
     
     try:
+        # Determine image orientation
+        img = Image.open(temp_file_path)
+        width, height = img.size
+        orientation = "vertical" if height > width else "horizontal"
+        img.close()
+
         # Apply the frame to the uploaded image
         if not apply_frame_to_image(temp_file_path):
             raise HTTPException(status_code=500, detail="Failed to apply frame to image")
@@ -204,8 +211,8 @@ async def upload_photo(
         cur = conn.cursor()
         try:
             cur.execute(
-                "INSERT INTO photos (id, filename, url, tags, user_id, likes, exif_gps_info, caption) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-                (uuid_photo, new_filename, public_url, tags, user_id, 0, exif_gps_info, caption)
+                "INSERT INTO photos (id, filename, url, tags, user_id, likes, exif_gps_info, caption, orientation) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (uuid_photo, new_filename, public_url, tags, user_id, 0, exif_gps_info, caption, orientation)
             )
             conn.commit()
         except psycopg2.Error as e:
@@ -216,7 +223,7 @@ async def upload_photo(
             conn.close()
         
         print(f"UUID: {uuid_photo_with_extension}")
-        return {"id": uuid_photo, "filename": new_filename, "url": public_url, "tags": tags, "user_id": user_id, "likes": 0, "exif_gps_info": json.loads(exif_gps_info) if exif_gps_info else None, "caption": caption}
+        return {"id": uuid_photo, "filename": new_filename, "url": public_url, "tags": tags, "user_id": user_id, "likes": 0, "exif_gps_info": json.loads(exif_gps_info) if exif_gps_info else None, "caption": caption, "orientation": orientation}
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
@@ -228,7 +235,7 @@ async def get_photo(image_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption FROM photos WHERE id = %s", (image_id,))
+        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption, orientation FROM photos WHERE id = %s", (image_id,))
         photo = cur.fetchone()
         if photo:
             return {
@@ -239,7 +246,8 @@ async def get_photo(image_id: str):
                 "user_id": photo[4],
                 "likes": photo[5],
                 "exif_gps_info": json.loads(photo[6]) if photo[6] else None,
-                "caption": photo[7]
+                "caption": photo[7],
+                "is_vertical": True if photo[8] == "vertical" else False
             }
         else:
             raise HTTPException(status_code=404, detail="Image not found in database")
@@ -254,7 +262,7 @@ async def get_all_photos():
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption FROM photos ORDER BY upload_date DESC")
+        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption, orientation FROM photos ORDER BY upload_date DESC")
         rows = cur.fetchall()
         columns = [col[0] for col in cur.description]
         photos = []
@@ -267,7 +275,8 @@ async def get_all_photos():
                 "user_id": row[4],
                 "likes": row[5],
                 "exif_gps_info": json.loads(row[6]) if row[6] else None,
-                "caption": row[7]
+                "caption": row[7],
+                "is_vertical": True if row[8] == "vertical" else False
             })
         return {"photos": photos}
     except psycopg2.Error as e:
@@ -281,7 +290,7 @@ async def get_photos_by_user(user_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption FROM photos WHERE user_id = %s", (user_id,))
+        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption, orientation FROM photos WHERE user_id = %s", (user_id,))
         rows = cur.fetchall()
         columns = [col[0] for col in cur.description]
         photos = []
@@ -294,7 +303,8 @@ async def get_photos_by_user(user_id: str):
                 "user_id": row[4],
                 "likes": row[5],
                 "exif_gps_info": json.loads(row[6]) if row[6] else None,
-                "caption": row[7]
+                "caption": row[7],
+                "is_vertical": True if row[8] == "vertical" else False
             })
         return {"photos": photos}
     except psycopg2.Error as e:
