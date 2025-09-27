@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form # Import Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
-from s3_upload import upload_file_to_s3
+from s3_upload import upload_file_to_s3, extract_exif_data
 import shutil
 import tempfile
 import os
@@ -113,6 +113,10 @@ async def upload_photo(
         
         if not public_url:
             raise HTTPException(status_code=500, detail="Failed to upload file or get public URL")
+        
+        # Extract EXIF data
+        exif_data = extract_exif_data(temp_file_path)
+        print(f"Extracted EXIF Data: {exif_data}")
 
         # Save photo metadata to the database using psycopg2
         conn = get_db_connection()
@@ -146,7 +150,14 @@ async def get_photo(image_id: str):
         cur.execute("SELECT id, filename, url, tags, user_id, likes FROM photos WHERE id = %s", (image_id,))
         photo = cur.fetchone()
         if photo:
-            return {"id": photo[0], "filename": photo[1], "url": photo[2], "tags": photo[3], "user_id": photo[4], "likes": photo[5]}
+            return {
+                "id": photo[0],
+                "filename": photo[1],
+                "url": photo[2],
+                "tags": photo[3],
+                "user_id": photo[4],
+                "likes": photo[5],
+            }
         else:
             raise HTTPException(status_code=404, detail="Image not found in database")
     except psycopg2.Error as e:
@@ -165,7 +176,14 @@ async def get_all_photos():
         columns = [col[0] for col in cur.description]
         photos = []
         for row in rows:
-            photos.append(dict(zip(columns, row)))
+            photos.append({
+                "id": row[0],
+                "filename": row[1],
+                "url": row[2],
+                "tags": row[3],
+                "user_id": row[4],
+                "likes": row[5],
+            })
         return {"photos": photos}
     except psycopg2.Error as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
@@ -183,7 +201,14 @@ async def get_photos_by_user(user_id: str):
         columns = [col[0] for col in cur.description]
         photos = []
         for row in rows:
-            photos.append(dict(zip(columns, row)))
+            photos.append({
+                "id": row[0],
+                "filename": row[1],
+                "url": row[2],
+                "tags": row[3],
+                "user_id": row[4],
+                "likes": row[5],
+            })
         return {"photos": photos}
     except psycopg2.Error as e:
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
