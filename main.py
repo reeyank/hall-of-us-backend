@@ -37,6 +37,37 @@ def convert_dms_to_decimal(dms, ref):
         decimal_degrees *= -1
     return decimal_degrees
 
+def apply_frame_to_image(image_path: str, frame_path: str = "./frame.png"):
+    try:
+        # Open the original image
+        original_image = Image.open(image_path).convert("RGBA")
+        
+        # Open the frame image
+        frame_image = Image.open(frame_path).convert("RGBA")
+        
+        # Resize frame to fit the original image dimensions
+        frame_image = frame_image.resize(original_image.size, Image.LANCZOS)
+        
+        # Create a new image with the original image as background
+        # and overlay the frame. The frame image is assumed to have
+        # transparency where the original image should show through.
+        # A simple overlay might just add the frame on top.
+        # For a more sophisticated merge, you might need to handle masks.
+        
+        # Simple alpha composite: original image + frame (with transparency)
+        framed_image = Image.alpha_composite(Image.new("RGBA", original_image.size), original_image)
+        framed_image = Image.alpha_composite(framed_image, frame_image)
+        
+        # Save the framed image to a temporary file, overwriting the original
+        framed_image.save(image_path, format="PNG")
+        return True
+    except FileNotFoundError:
+        print(f"Error: Frame file not found at {frame_path}")
+        return False
+    except Exception as e:
+        print(f"Error applying frame: {e}")
+        return False
+
 # Function to get a database connection
 def get_db_connection():
     conn = None
@@ -145,9 +176,16 @@ async def upload_photo(
         temp_file_path = temp_file.name
     
     try:
+        # Apply the frame to the uploaded image
+        if not apply_frame_to_image(temp_file_path):
+            raise HTTPException(status_code=500, detail="Failed to apply frame to image")
+
         uuid_photo = uuid.uuid4().hex
-        file_extension = os.path.splitext(file.filename)[1]
-        uuid_photo_with_extension = uuid_photo + file_extension
+        # Use original filename but change extension to .png since it's converted
+        original_filename_without_ext = os.path.splitext(file.filename)[0]
+        new_filename = f"{original_filename_without_ext}.png"
+
+        uuid_photo_with_extension = uuid_photo + ".png" # Always save as PNG after framing
         s3_object_name = uuid_photo_with_extension
         public_url = upload_file_to_s3(temp_file_path, s3_object_name)
         
@@ -167,7 +205,7 @@ async def upload_photo(
         try:
             cur.execute(
                 "INSERT INTO photos (id, filename, url, tags, user_id, likes, exif_gps_info, caption) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-                (uuid_photo, file.filename, public_url, tags, user_id, 0, exif_gps_info, caption)
+                (uuid_photo, new_filename, public_url, tags, user_id, 0, exif_gps_info, caption)
             )
             conn.commit()
         except psycopg2.Error as e:
@@ -178,7 +216,7 @@ async def upload_photo(
             conn.close()
         
         print(f"UUID: {uuid_photo_with_extension}")
-        return {"id": uuid_photo, "filename": file.filename, "url": public_url, "tags": tags, "user_id": user_id, "likes": 0, "exif_gps_info": json.loads(exif_gps_info) if exif_gps_info else None, "caption": caption}
+        return {"id": uuid_photo, "filename": new_filename, "url": public_url, "tags": tags, "user_id": user_id, "likes": 0, "exif_gps_info": json.loads(exif_gps_info) if exif_gps_info else None, "caption": caption}
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
