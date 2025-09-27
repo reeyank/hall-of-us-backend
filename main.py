@@ -274,11 +274,6 @@ async def like_photo(photo_id: str, user_id: str):
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="User not found")
 
-        # Check if already liked
-        cur.execute("SELECT 1 FROM photo_likes WHERE photo_id = %s AND user_id = %s", (photo_id, user_id))
-        if cur.fetchone():
-            raise HTTPException(status_code=400, detail="Photo already liked by this user")
-
         # Add like and increment count
         cur.execute("INSERT INTO photo_likes (photo_id, user_id) VALUES (%s, %s)", (photo_id, user_id))
         cur.execute("UPDATE photos SET likes = likes + 1 WHERE id = %s", (photo_id,))
