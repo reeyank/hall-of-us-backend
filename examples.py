@@ -9,7 +9,7 @@ from langchain import (
     image_tagging_api,
     filter_generation_api,
     ImageTaggingRequest,
-    FilterGenerationRequest
+    FilterGenerationRequest,
 )
 
 
@@ -20,9 +20,9 @@ async def example_image_tagging():
     # Example 1: Image from URL
     print("1. Tagging image from URL:")
     url_request = ImageTaggingRequest(
-        image_url="https://example.com/sample-image.jpg",
+        image_url="https://www.rd.com/wp-content/uploads/2021/03/GettyImages-1133605325-scaled-e1617227898456.jpg",
         max_tags=5,
-        confidence_threshold=0.7
+        confidence_threshold=0.7,
     )
 
     response = await image_tagging_api.generate_tags_from_url(url_request)
@@ -33,7 +33,7 @@ async def example_image_tagging():
     else:
         print(f"Error: {response.error}")
 
-    print("\n" + "="*50 + "\n")
+    print("\n" + "=" * 50 + "\n")
 
     # Example 2: Image from base64
     print("2. Tagging image from base64:")
@@ -41,9 +41,7 @@ async def example_image_tagging():
     sample_base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
 
     base64_request = ImageTaggingRequest(
-        image_base64=sample_base64,
-        max_tags=3,
-        confidence_threshold=0.5
+        image_base64=sample_base64, max_tags=3, confidence_threshold=0.5
     )
 
     response = await image_tagging_api.generate_tags_from_base64(base64_request)
@@ -64,33 +62,33 @@ async def example_filter_generation():
             "field": "created_at",
             "type": "date",
             "operators": [">=", "<=", "=="],
-            "display_name": "Creation Date"
+            "display_name": "Creation Date",
         },
         {
             "field": "popularity_score",
             "type": "numeric",
             "operators": [">=", "<=", "=="],
-            "display_name": "Popularity Score"
+            "display_name": "Popularity Score",
         },
         {
             "field": "category",
             "type": "categorical",
             "operators": ["in", "==", "!="],
             "display_name": "Category",
-            "values": ["technology", "science", "art", "music", "sports"]
+            "values": ["technology", "science", "art", "music", "sports"],
         },
         {
             "field": "title",
             "type": "text",
             "operators": ["contains", "==", "startswith"],
-            "display_name": "Title"
+            "display_name": "Title",
         },
         {
             "field": "tags",
             "type": "array",
             "operators": ["contains_any", "contains_all"],
-            "display_name": "Tags"
-        }
+            "display_name": "Tags",
+        },
     ]
 
     # Example 1: Recent popular tech items
@@ -98,7 +96,7 @@ async def example_filter_generation():
     request1 = FilterGenerationRequest(
         natural_language_query="Show me recent popular items in technology category",
         available_filters=available_filters,
-        max_filters=3
+        max_filters=3,
     )
 
     response = await filter_generation_api.generate_filters(request1)
@@ -110,14 +108,14 @@ async def example_filter_generation():
     else:
         print(f"Error: {response.error}")
 
-    print("\n" + "-"*50 + "\n")
+    print("\n" + "-" * 50 + "\n")
 
     # Example 2: More complex query
     print("2. Query: 'Find trending music content from the last month'")
     request2 = FilterGenerationRequest(
         natural_language_query="Find trending music content from the last month",
         available_filters=available_filters,
-        max_filters=4
+        max_filters=4,
     )
 
     response = await filter_generation_api.generate_filters(request2)
@@ -136,7 +134,7 @@ async def example_filter_validation():
     available_filters = [
         {"field": "created_at", "type": "date"},
         {"field": "category", "type": "categorical"},
-        {"field": "popularity_score", "type": "numeric"}
+        {"field": "popularity_score", "type": "numeric"},
     ]
 
     # Test filters (mix of valid and invalid)
@@ -145,23 +143,25 @@ async def example_filter_validation():
             "type": "date_range",
             "field": "created_at",  # Valid field
             "operator": ">=",
-            "value": "2024-01-01"
+            "value": "2024-01-01",
         },
         {
             "type": "categorical",
             "field": "category",  # Valid field
             "operator": "==",
-            "value": "technology"
+            "value": "technology",
         },
         {
             "type": "text_search",
             "field": "description",  # Invalid field (not in available_filters)
             "operator": "contains",
-            "value": "test"
-        }
+            "value": "test",
+        },
     ]
 
-    response = await filter_generation_api.validate_filters(test_filters, available_filters)
+    response = await filter_generation_api.validate_filters(
+        test_filters, available_filters
+    )
     print(f"Success: {response.success}")
     if response.success:
         print(f"Valid filters: {response.data['valid_filters']}")
