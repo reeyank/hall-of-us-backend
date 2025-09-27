@@ -292,7 +292,7 @@ async def like_photo(photo_id: str, user_id: str):
         conn.close()
 
 @app.delete("/photos/{photo_id}/unlike")
-async def unlike_photo(photo_id: str, user_id: str = Form(...)):
+async def unlike_photo(photo_id: str, user_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
