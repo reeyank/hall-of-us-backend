@@ -291,7 +291,7 @@ async def like_photo(photo_id: str, user_id: str):
         cur.close()
         conn.close()
 
-@app.delete("/photos/{photo_id}/unlike")
+@app.post("/photos/{photo_id}/unlike")
 async def unlike_photo(photo_id: str, user_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
