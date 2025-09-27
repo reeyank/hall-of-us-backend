@@ -1,5 +1,5 @@
 # main.py
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import APIRouter, FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any
 import base64
@@ -11,21 +11,21 @@ from langchain import (
     FilterGenerationRequest,
     APIResponse,
 )
-from main import app as main_app  # Import the existing FastAPI app if needed
 
+router = APIRouter(prefix="/langchain", tags=["LangChain"])
 
-@main_app.get("/")
+@router.get("/")
 async def read_root():
     return {"message": "Hall of Us API - LangChain powered backend"}
 
 
-@main_app.get("/health")
+@router.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "hall-of-us-backend"}
 
 
 # Image Tagging Endpoints
-@main_app.post("/api/v1/image/tags/from-url")
+@router.post("/api/v1/image/tags/from-url")
 async def generate_tags_from_url(request: ImageTaggingRequest):
     """Generate tags from an image URL"""
     try:
@@ -49,7 +49,7 @@ async def generate_tags_from_url(request: ImageTaggingRequest):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@main_app.post("/api/v1/image/tags/from-base64")
+@router.post("/api/v1/image/tags/from-base64")
 async def generate_tags_from_base64(request: ImageTaggingRequest):
     """Generate tags from a base64 encoded image"""
     try:
@@ -75,7 +75,7 @@ async def generate_tags_from_base64(request: ImageTaggingRequest):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@main_app.post("/api/v1/image/tags/from-file")
+@router.post("/api/v1/image/tags/from-file")
 async def generate_tags_from_file(
     file: UploadFile = File(...), max_tags: int = 10, confidence_threshold: float = 0.5
 ):
@@ -119,7 +119,7 @@ async def generate_tags_from_file(
 
 
 # Filter Generation Endpoints
-@main_app.post("/api/v1/filters/generate")
+@router.post("/api/v1/filters/generate")
 async def generate_filters(request: FilterGenerationRequest):
     """Generate filter configuration from natural language query"""
     try:
@@ -143,7 +143,7 @@ async def generate_filters(request: FilterGenerationRequest):
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-@main_app.post("/api/v1/filters/validate")
+@router.post("/api/v1/filters/validate")
 async def validate_filters(
     filters: List[Dict[str, Any]], available_filters: List[Dict[str, Any]]
 ):
@@ -170,7 +170,7 @@ async def validate_filters(
 
 
 # Example endpoint for testing
-@main_app.post("/api/v1/test/image-tagging")
+@router.post("/api/v1/test/image-tagging")
 async def test_image_tagging():
     """Test endpoint for image tagging with sample data"""
     sample_request = ImageTaggingRequest(
@@ -182,7 +182,7 @@ async def test_image_tagging():
     return await generate_tags_from_url(sample_request)
 
 
-@main_app.post("/api/v1/test/filter-generation")
+@router.post("/api/v1/test/filter-generation")
 async def test_filter_generation():
     """Test endpoint for filter generation with sample data"""
     sample_request = FilterGenerationRequest(
