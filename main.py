@@ -1,9 +1,10 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Depends # Import Form, Depends
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form # Import Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from s3_upload import upload_file_to_s3, extract_exif_data
 import shutil
 import tempfile
+from langchain_calls import router as langchain_router
 import os
 import uuid
 import psycopg2
@@ -55,7 +56,7 @@ def generate_plaque_image(text: str, plaque_id: str):
     text_bbox = d.textbbox((0,0), text, font=font)
     text_width = text_bbox[2] - text_bbox[0]
     text_height = text_bbox[3] - text_bbox[1]
-    
+
     x = (img_width - text_width) / 2
     y = (img_height - text_height) / 2
 
@@ -70,23 +71,23 @@ def apply_frame_to_image(image_path: str, frame_path: str = "./frame.png"):
     try:
         # Open the original image
         original_image = Image.open(image_path).convert("RGBA")
-        
+
         # Open the frame image
         frame_image = Image.open(frame_path).convert("RGBA")
-        
+
         # Resize frame to fit the original image dimensions
         frame_image = frame_image.resize(original_image.size, Image.LANCZOS)
-        
+
         # Create a new image with the original image as background
         # and overlay the frame. The frame image is assumed to have
         # transparency where the original image should show through.
         # A simple overlay might just add the frame on top.
         # For a more sophisticated merge, you might need to handle masks.
-        
+
         # Simple alpha composite: original image + frame (with transparency)
         framed_image = Image.alpha_composite(Image.new("RGBA", original_image.size), original_image)
         framed_image = Image.alpha_composite(framed_image, frame_image)
-        
+
         # Save the framed image to a temporary file, overwriting the original
         framed_image.save(image_path, format="PNG")
         return True
@@ -101,11 +102,18 @@ def apply_frame_to_image(image_path: str, frame_path: str = "./frame.png"):
 def get_db_connection():
     conn = None
     try:
-        conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT)
+        conn = psycopg2.connect(
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            host=DB_HOST,
+            port=DB_PORT,
+        )
         return conn
     except psycopg2.Error as e:
         print(f"Error connecting to database: {e}")
         raise HTTPException(status_code=500, detail="Database connection error")
+
 
 # Dependency to get a database cursor
 def get_db_cursor():
@@ -116,6 +124,7 @@ def get_db_cursor():
     finally:
         cur.close()
         conn.close()
+
 
 # Function to initialize the database table
 def initialize_db():
@@ -173,11 +182,14 @@ def initialize_db():
         if conn:
             conn.close()
 
+
 app = FastAPI()
+
 
 @app.on_event("startup")
 async def startup_event():
     initialize_db()
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -187,10 +199,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# add langchain router
+app.include_router(langchain_router)
+
 
 @app.get("/")
 async def read_root():
     return {"message": "Hello, FastAPI!"}
+
 
 @app.post("/photos/upload")
 async def upload_photo(
@@ -201,11 +217,11 @@ async def upload_photo(
 ):
     if not file:
         raise HTTPException(status_code=400, detail="No file provided")
-    
+
     with tempfile.NamedTemporaryFile(delete=False) as temp_file:
         shutil.copyfileobj(file.file, temp_file)
         temp_file_path = temp_file.name
-    
+
     try:
         # Determine image orientation
         img = Image.open(temp_file_path)
@@ -225,7 +241,8 @@ async def upload_photo(
         uuid_photo_with_extension = uuid_photo + ".png" # Always save as PNG after framing
         s3_object_name = uuid_photo_with_extension
         public_url = upload_file_to_s3(temp_file_path, s3_object_name)
-        
+
+
         plaque_url = None
         if caption:
             plaque_temp_file_path = generate_plaque_image(caption, uuid_photo)
@@ -234,8 +251,10 @@ async def upload_photo(
             os.remove(plaque_temp_file_path) # Clean up temporary plaque file
 
         if not public_url:
-            raise HTTPException(status_code=500, detail="Failed to upload file or get public URL")
-        
+            raise HTTPException(
+                status_code=500, detail="Failed to upload file or get public URL"
+            )
+
         # Extract EXIF data
         exif_data = extract_exif_data(temp_file_path)
         exif_gps_info_raw = exif_data.get("GPSInfo")
@@ -258,7 +277,7 @@ async def upload_photo(
         finally:
             cur.close()
             conn.close()
-        
+
         print(f"UUID: {uuid_photo_with_extension}")
         return {"id": uuid_photo, "filename": new_filename, "url": public_url, "tags": tags, "user_id": user_id, "likes": 0, "exif_gps_info": json.loads(exif_gps_info) if exif_gps_info else None, "caption": caption, "orientation": orientation, "plaque_url": plaque_url, "plaque_id": f"P_{uuid_photo}" if caption else None}
     except Exception as e:
@@ -266,6 +285,7 @@ async def upload_photo(
         raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
     finally:
         os.remove(temp_file_path)
+
 
 @app.get("/photos/{image_id}")
 async def get_photo(image_id: str):
@@ -295,6 +315,7 @@ async def get_photo(image_id: str):
     finally:
         cur.close()
         conn.close()
+
 
 @app.get("/photos")
 async def get_all_photos():
@@ -326,6 +347,7 @@ async def get_all_photos():
         cur.close()
         conn.close()
 
+
 @app.get("/photos/user/{user_id}")
 async def get_photos_by_user(user_id: str):
     conn = get_db_connection()
@@ -355,6 +377,7 @@ async def get_photos_by_user(user_id: str):
     finally:
         cur.close()
         conn.close()
+<<<<<<< HEAD
 
 @app.post("/photos/{photo_id}/like")
 async def like_photo(photo_id: str, user_id: str):
@@ -428,7 +451,7 @@ async def get_all_photos_gps_data():
             exif_gps_info_str = row[1]
             try:
                 gps_info = json.loads(exif_gps_info_str)
-                
+
                 latitude_dms = gps_info.get("2") # Key "2" for latitude DMS
                 latitude_ref = gps_info.get("1") # Key "1" for latitude reference
                 longitude_dms = gps_info.get("4") # Key "4" for longitude DMS
@@ -471,7 +494,7 @@ async def get_image_with_text(text: str = "Hello, World!"):
     text_bbox = d.textbbox((0,0), text, font=font)
     text_width = text_bbox[2] - text_bbox[0]
     text_height = text_bbox[3] - text_bbox[1]
-    
+
     x = (img_width - text_width) / 2
     y = (img_height - text_height) / 2
 
