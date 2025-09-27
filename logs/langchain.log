@@ -121,3 +121,6 @@ tags
 [2025-09-27 03:06:28] [[32mINFO[0m] [langchain.wrapper] API chain completed in 1531.98ms
 [2025-09-27 03:06:28] [[32mINFO[0m] [langchain.wrapper] Starting API chain with inputs: {'filters': [{'type': 'date_range', 'field': 'created_at', 'operator': '>=', 'value': '2024-01-01'}, {'type': 'categorical', 'field': 'category', 'operator': '==', 'value': 'technology'}, {'type': 'text_search', 'field': 'description', 'operator': 'contains', 'value': 'test'}], 'available_filters': [{'field': 'created_at', 'type': 'date'}, {'field': 'category', 'type': 'categorical'}, {'field': 'popularity_score', 'type': 'numeric'}]}
 [2025-09-27 03:06:28] [[32mINFO[0m] [langchain.wrapper] API chain completed in 102.13ms
+[2025-09-27 15:25:55] [[32mINFO[0m] [langchain.wrapper] OpenAI client initialized successfully
+[2025-09-27 15:26:03] [[32mINFO[0m] [langchain.wrapper] OpenAI client initialized successfully
+[2025-09-27 15:26:05] [[32mINFO[0m] [langchain.wrapper] OpenAI client initialized successfully
