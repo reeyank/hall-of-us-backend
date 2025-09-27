@@ -16,7 +16,7 @@ from langchain import (
 async def example_image_tagging():
     """Example of using the image tagging API"""
     print("=== Image Tagging Examples ===\n")
-    
+
     # Example 1: Image from URL
     print("1. Tagging image from URL:")
     url_request = ImageTaggingRequest(
@@ -24,7 +24,7 @@ async def example_image_tagging():
         max_tags=5,
         confidence_threshold=0.7
     )
-    
+
     response = await image_tagging_api.generate_tags_from_url(url_request)
     print(f"Success: {response.success}")
     if response.success:
@@ -32,20 +32,20 @@ async def example_image_tagging():
         print(f"Execution time: {response.execution_time_ms}ms")
     else:
         print(f"Error: {response.error}")
-    
+
     print("\n" + "="*50 + "\n")
-    
+
     # Example 2: Image from base64
     print("2. Tagging image from base64:")
     # This is a small 1x1 transparent PNG in base64
     sample_base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
-    
+
     base64_request = ImageTaggingRequest(
         image_base64=sample_base64,
         max_tags=3,
         confidence_threshold=0.5
     )
-    
+
     response = await image_tagging_api.generate_tags_from_base64(base64_request)
     print(f"Success: {response.success}")
     if response.success:
@@ -57,7 +57,7 @@ async def example_image_tagging():
 async def example_filter_generation():
     """Example of using the filter generation API"""
     print("\n=== Filter Generation Examples ===\n")
-    
+
     # Example available filters (what your system supports)
     available_filters = [
         {
@@ -92,7 +92,7 @@ async def example_filter_generation():
             "display_name": "Tags"
         }
     ]
-    
+
     # Example 1: Recent popular tech items
     print("1. Query: 'Show me recent popular items in technology category'")
     request1 = FilterGenerationRequest(
@@ -100,7 +100,7 @@ async def example_filter_generation():
         available_filters=available_filters,
         max_filters=3
     )
-    
+
     response = await filter_generation_api.generate_filters(request1)
     print(f"Success: {response.success}")
     if response.success:
@@ -109,9 +109,9 @@ async def example_filter_generation():
         print(f"Confidence: {response.data.confidence_score}")
     else:
         print(f"Error: {response.error}")
-    
+
     print("\n" + "-"*50 + "\n")
-    
+
     # Example 2: More complex query
     print("2. Query: 'Find trending music content from the last month'")
     request2 = FilterGenerationRequest(
@@ -119,7 +119,7 @@ async def example_filter_generation():
         available_filters=available_filters,
         max_filters=4
     )
-    
+
     response = await filter_generation_api.generate_filters(request2)
     print(f"Success: {response.success}")
     if response.success:
@@ -132,13 +132,13 @@ async def example_filter_generation():
 async def example_filter_validation():
     """Example of validating generated filters"""
     print("\n=== Filter Validation Example ===\n")
-    
+
     available_filters = [
         {"field": "created_at", "type": "date"},
         {"field": "category", "type": "categorical"},
         {"field": "popularity_score", "type": "numeric"}
     ]
-    
+
     # Test filters (mix of valid and invalid)
     test_filters = [
         {
@@ -160,7 +160,7 @@ async def example_filter_validation():
             "value": "test"
         }
     ]
-    
+
     response = await filter_generation_api.validate_filters(test_filters, available_filters)
     print(f"Success: {response.success}")
     if response.success:
