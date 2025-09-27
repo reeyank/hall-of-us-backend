@@ -33,6 +33,7 @@ try:
     from langchain_core.runnables import Runnable, RunnableLambda
 except ImportError:
     try:
+        logger.warning("Failed to import from langchain_core.")
         # Fall back to older LangChain imports
         from langchain.callbacks.base import AsyncCallbackHandler
         from langchain.schema.runnable import Runnable, RunnableLambda
@@ -41,6 +42,11 @@ except ImportError:
         logger.warning("LangChain not available, using stub implementations")
 
         sys.exit(1)
+
+import langchain
+langchain.verbose = False
+langchain.debug = False
+langchain.llm_cache = False
 
 
 class APICallbackHandler(AsyncCallbackHandler):
