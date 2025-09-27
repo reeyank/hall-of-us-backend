@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form # Import Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form  # Import Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from s3_upload import upload_file_to_s3, extract_exif_data
@@ -10,18 +10,21 @@ import uuid
 import psycopg2
 from datetime import datetime
 from dotenv import load_dotenv
-import json # Re-introduce the json module
+import json  # Re-introduce the json module
 from pydantic import BaseModel # Import BaseModel
 from PIL import Image, ImageDraw, ImageFont # Import Pillow components
 from io import BytesIO # Import BytesIO
 from fastapi.responses import Response # Import Response
+from pydantic import BaseModel
 
 load_dotenv()
+
 
 # Pydantic model for User
 class User(BaseModel):
     username: str
     password: str
+
 
 DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
