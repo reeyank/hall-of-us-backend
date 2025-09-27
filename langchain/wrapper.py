@@ -6,6 +6,7 @@ It handles common concerns like error handling, retries, logging, and response f
 Now includes OpenAI integration for LLM and Vision API calls.
 """
 
+import sys
 import logging
 import os
 from dotenv import load_dotenv
@@ -17,29 +18,13 @@ from .models import APIResponse, logger
 
 # OpenAI integration
 try:
-    import openai
     from openai import AsyncOpenAI
 
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
     logger.warning("OpenAI not available. Install with: pip install openai")
-
-    # Create stub client
-    class AsyncOpenAI:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        @property
-        def chat(self):
-            return self
-
-        @property
-        def completions(self):
-            return self
-
-        async def create(self, *args, **kwargs):
-            raise NotImplementedError("OpenAI not installed")
+    sys.exit(1)
 
 
 try:
@@ -55,45 +40,7 @@ except ImportError:
         # If LangChain is not available, create stub classes
         logger.warning("LangChain not available, using stub implementations")
 
-        class AsyncCallbackHandler:
-            """Stub callback handler when LangChain is not available"""
-
-            def __init__(self):
-                self.start_time = None
-                self.errors = []
-
-            async def on_chain_start(
-                self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs
-            ) -> None:
-                self.start_time = datetime.now()
-                logger.info(f"Starting API chain with inputs: {inputs}")
-
-            async def on_chain_end(self, outputs: Dict[str, Any], **kwargs) -> None:
-                if self.start_time:
-                    execution_time = (
-                        datetime.now() - self.start_time
-                    ).total_seconds() * 1000
-                    logger.info(f"API chain completed in {execution_time:.2f}ms")
-
-            async def on_chain_error(self, error: Exception, **kwargs) -> None:
-                logger.error(f"API chain error: {str(error)}")
-                self.errors.append(str(error))
-
-        class Runnable:
-            """Stub runnable when LangChain is not available"""
-
-            def __init__(self, func: Callable):
-                self.func = func
-
-            async def ainvoke(
-                self, inputs: Dict[str, Any], config: Optional[Dict] = None
-            ) -> Any:
-                return await self.func(inputs)
-
-        class RunnableLambda(Runnable):
-            """Stub RunnableLambda when LangChain is not available"""
-
-            pass
+        sys.exit(1)
 
 
 class APICallbackHandler(AsyncCallbackHandler):
