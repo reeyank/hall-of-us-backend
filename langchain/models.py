@@ -674,9 +674,9 @@ class ChatGenerateTagsRequest(BaseModel):
             self.current_tags = self.selectedTags
         if not self.cedar_state:
             self.cedar_state = {
-                'additionalContext': self.additionalContext,
-                'currentContext': self.currentContext,
-                'chatHistory': self.chatHistory
+                "additionalContext": self.additionalContext,
+                "currentContext": self.currentContext,
+                "chatHistory": self.chatHistory,
             }
 
 
@@ -705,9 +705,9 @@ class ChatFillTagsRequest(BaseModel):
             self.max_tags = self.maxTags
         if not self.cedar_state:
             self.cedar_state = {
-                'additionalContext': self.additionalContext,
-                'currentContext': self.currentContext,
-                'chatHistory': self.chatHistory
+                "additionalContext": self.additionalContext,
+                "currentContext": self.currentContext,
+                "chatHistory": self.chatHistory,
             }
 
 
@@ -735,9 +735,9 @@ class ChatGenerateCaptionRequest(BaseModel):
             self.tags = self.currentTags
         if not self.cedar_state:
             self.cedar_state = {
-                'additionalContext': self.additionalContext,
-                'currentContext': self.currentContext,
-                'chatHistory': self.chatHistory
+                "additionalContext": self.additionalContext,
+                "currentContext": self.currentContext,
+                "chatHistory": self.chatHistory,
             }
 
 
@@ -767,7 +767,68 @@ class ChatFillCaptionRequest(BaseModel):
             self.image_url = self.imageUrl
         if not self.cedar_state:
             self.cedar_state = {
-                'additionalContext': self.additionalContext,
-                'currentContext': self.currentContext,
-                'chatHistory': self.chatHistory
+                "additionalContext": self.additionalContext,
+                "currentContext": self.currentContext,
+                "chatHistory": self.chatHistory,
             }
+
+
+class ChatFilterImagesRequest(BaseModel):
+    """Request model from frontend to filter images using chat/context state."""
+
+    # The Cedar-style chat state payload (keeps messages, threads, etc.)
+    cedarState: Optional[Dict[str, Any]] = None
+
+    # Active filters (frontend sends { tag, userId, date } inside activeFilters)
+    activeFilters: Optional[Dict[str, Any]] = None
+
+    # The frontend now includes available filter options and explicit lists
+    availableFilters: Optional[Dict[str, Any]] = None
+    allTags: Optional[List[str]] = None
+    allUserIds: Optional[List[str]] = None
+
+    # Optional pagination or limits (frontend can extend as needed)
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "cedarState": {
+                    "messages": [],
+                    "currentThreadId": None,
+                    "threads": [],
+                    "threadMap": {},
+                },
+                "activeFilters": {"tag": "food", "userId": "123", "date": "2025-09-28"},
+                "availableFilters": {
+                    "tags": ["food", "fun"],
+                    "userIds": ["123", "456"],
+                    "date": [],
+                },
+                "allTags": ["food", "fun", "hiking"],
+                "allUserIds": ["123", "456"],
+                "limit": 20,
+                "offset": 0,
+            }
+        }
+
+    def model_post_init(self, __context=None) -> None:
+        """Normalize camelCase/legacy fields to snake_case equivalents for internal use."""
+        # Allow `cedar_state` or `cedarState`
+        if not hasattr(self, "cedar_state") or self.cedar_state is None:
+            self.cedar_state = self.cedarState
+
+        # Normalize active filters
+        if not hasattr(self, "active_filters") or self.active_filters is None:
+            self.active_filters = self.activeFilters or (self.cedar_state or {}).get(
+                "activeFilters"
+            )
+
+        # Map available filters and lists
+        if not hasattr(self, "available_filters") or self.available_filters is None:
+            self.available_filters = self.availableFilters
+        if not hasattr(self, "all_tags") or self.all_tags is None:
+            self.all_tags = self.allTags
+        if not hasattr(self, "all_user_ids") or self.all_user_ids is None:
+            self.all_user_ids = self.allUserIds
