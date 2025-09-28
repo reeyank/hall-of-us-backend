@@ -791,9 +791,27 @@ class ChatFilterImagesRequest(BaseModel):
     limit: Optional[int] = None
     offset: Optional[int] = None
 
-    class Config:
-        schema_extra = {
+    # Additional optional metadata fields frontend may send
+    requestId: Optional[str] = None
+    clientSessionId: Optional[str] = None
+    userId: Optional[str] = None
+    requestTimestamp: Optional[str] = None
+    editorContent: Optional[str] = None
+    compiledAdditionalContext: Optional[Dict[str, Any]] = None
+    registeredStates: Optional[Dict[str, Any]] = None
+    agentConnectionLogs: Optional[List[Dict[str, Any]]] = None
+    naturalLanguageFilter: Optional[str] = None
+    trigger: Optional[Any] = None
+
+    # Use Pydantic v2 model_config only (includes example and allow extra fields)
+    model_config = {
+        "extra": "allow",
+        "json_schema_extra": {
             "example": {
+                "requestId": "1695916800000-abc123",
+                "clientSessionId": "sess-xyz",
+                "userId": "user-123",
+                "requestTimestamp": "2025-09-28T12:00:00Z",
                 "cedarState": {
                     "messages": [],
                     "currentThreadId": None,
@@ -808,10 +826,12 @@ class ChatFilterImagesRequest(BaseModel):
                 },
                 "allTags": ["food", "fun", "hiking"],
                 "allUserIds": ["123", "456"],
+                "naturalLanguageFilter": "show me photos of food",
                 "limit": 20,
                 "offset": 0,
             }
-        }
+        },
+    }
 
     def model_post_init(self, __context=None) -> None:
         """Normalize camelCase/legacy fields to snake_case equivalents for internal use."""
@@ -832,3 +852,36 @@ class ChatFilterImagesRequest(BaseModel):
             self.all_tags = self.allTags
         if not hasattr(self, "all_user_ids") or self.all_user_ids is None:
             self.all_user_ids = self.allUserIds
+
+        # Map request metadata into snake_case helpers
+        if not hasattr(self, "request_id") or self.request_id is None:
+            self.request_id = getattr(self, "requestId", None)
+        if not hasattr(self, "client_session_id") or self.client_session_id is None:
+            self.client_session_id = getattr(self, "clientSessionId", None)
+        if not hasattr(self, "user_id") or self.user_id is None:
+            self.user_id = getattr(self, "userId", None)
+        if not hasattr(self, "request_timestamp") or self.request_timestamp is None:
+            self.request_timestamp = getattr(self, "requestTimestamp", None)
+        if not hasattr(self, "editor_content") or self.editor_content is None:
+            self.editor_content = getattr(self, "editorContent", None)
+        if (
+            not hasattr(self, "compiled_additional_context")
+            or self.compiled_additional_context is None
+        ):
+            self.compiled_additional_context = getattr(
+                self, "compiledAdditionalContext", None
+            )
+        if not hasattr(self, "registered_states") or self.registered_states is None:
+            self.registered_states = getattr(self, "registeredStates", None)
+        if (
+            not hasattr(self, "agent_connection_logs")
+            or self.agent_connection_logs is None
+        ):
+            self.agent_connection_logs = getattr(self, "agentConnectionLogs", None)
+        if (
+            not hasattr(self, "natural_language_filter")
+            or self.natural_language_filter is None
+        ):
+            self.natural_language_filter = getattr(self, "naturalLanguageFilter", None)
+        if not hasattr(self, "trigger_obj") or self.trigger_obj is None:
+            self.trigger_obj = getattr(self, "trigger", None)

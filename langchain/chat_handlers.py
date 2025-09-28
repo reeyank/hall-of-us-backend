@@ -416,63 +416,79 @@ Return just the enhanced caption text, nothing else.
             messages = [{"role": "user", "content": prompt}]
 
             # Ask the LLM to produce structured filters
+            # Include natural language filter if provided
+            nl_filter = getattr(request, "natural_language_filter", None) or getattr(
+                request, "naturalLanguageFilter", None
+            )
+            if nl_filter:
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": f"User's natural language filter: {nl_filter}",
+                    }
+                )
+
             result = await self.langchain_wrapper.call_openai_chat(
-                messages=messages, temperature=0.2, max_tokens=400
+                messages=messages, temperature=0.0, max_tokens=500
             )
 
             content = result.get("content", "")
 
-            # Try to parse JSON from the model output robustly
-            filters = []
-            try:
-                # Find first JSON object or array
-                start_obj = content.find("{")
-                start_arr = content.find("[")
-                parsed = None
-                if start_obj != -1:
-                    parsed = json.loads(content[start_obj:])
-                    # If top-level is object with filters key
-                    if isinstance(parsed, dict) and "filters" in parsed:
-                        filters = parsed.get("filters", [])
-                    elif isinstance(parsed, list):
-                        filters = parsed
-                    else:
-                        # Try to find 'filters' nested
-                        filters = parsed.get("filters") or []
-                elif start_arr != -1:
-                    parsed = json.loads(content[start_arr:])
-                    filters = parsed
-            except Exception:
-                filters = []
+            # Helper to extract JSON from text
+            def _extract_json(text: str):
+                text = text.strip()
+                # Try to find the first JSON object or array and decode
+                first_obj = text.find("{")
+                first_arr = text.find("[")
+                try:
+                    if first_obj != -1:
+                        return json.loads(text[first_obj:])
+                    if first_arr != -1:
+                        return json.loads(text[first_arr:])
+                    # As a last resort, try to parse whole text
+                    return json.loads(text)
+                except Exception:
+                    return None
 
-            # Fallback: build simple equality filters from active filters
-            if not filters:
-                act = active or {}
-                for k, v in act.items():
-                    if v is None or (isinstance(v, str) and v.strip() == ""):
-                        continue
-                    # Prefer tagging fields to use 'in' for lists, equality otherwise
-                    if k.lower() in ("tag", "tags"):
-                        # if value is list
-                        if isinstance(v, list):
-                            for val in v:
-                                filters.append(
-                                    {"field": "tag", "operator": "in", "value": val}
-                                )
-                        else:
-                            filters.append(
-                                {"field": "tag", "operator": "==", "value": v}
-                            )
-                    elif k.lower() in ("userid", "userId", "user_id"):
-                        filters.append(
-                            {"field": "userId", "operator": "==", "value": v}
-                        )
-                    elif k.lower() == "date":
-                        filters.append(
-                            {"field": "created_at", "operator": "==", "value": v}
-                        )
-                    else:
-                        filters.append({"field": k, "operator": "==", "value": v})
+            parsed = _extract_json(content)
+
+            # If parsing failed, ask model once to reformat its previous answer into JSON only
+            if parsed is None:
+                followup_prompt = (
+                    "The previous response could not be parsed as valid JSON.\n"
+                    "Please extract or convert the response into a single JSON object with a top-level key 'filters' whose value is a list of filter objects. "
+                    'Each filter object must be of the form {"field": <field_name>, "operator": <op>, "value": <value>}. '
+                    "Do NOT include any additional text. Return ONLY the JSON object.\n\n"
+                    f"Previous model output: {content}"
+                )
+
+                reform_messages = [{"role": "user", "content": followup_prompt}]
+
+                reform_result = await self.langchain_wrapper.call_openai_chat(
+                    messages=reform_messages, temperature=0.0, max_tokens=300
+                )
+
+                reform_text = reform_result.get("content", "")
+                parsed = _extract_json(reform_text)
+
+            if parsed is None:
+                # Give up after one retry — prefer failing loudly rather than silently applying heuristics
+                logger.error(
+                    "LLM did not return valid JSON for filters. Raw output: %s", content
+                )
+                raise HTTPException(
+                    status_code=500,
+                    detail="OpenAI did not return valid JSON for filters. Check model response logs.",
+                )
+
+            # parsed may be an object with 'filters' key or a list
+            if isinstance(parsed, dict) and "filters" in parsed:
+                filters = parsed.get("filters", [])
+            elif isinstance(parsed, list):
+                filters = parsed
+            else:
+                # If parsed is an object but not containing 'filters', try to coerce
+                filters = parsed.get("filters") if isinstance(parsed, dict) else []
 
             # Limit filters
             if isinstance(filters, list) and len(filters) > limit:
