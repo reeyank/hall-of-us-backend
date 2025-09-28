@@ -29,7 +29,9 @@ router = APIRouter(prefix="/langchain", tags=["LangChain"])
 langchain_wrapper = LangChainAPIWrapper()
 
 
-async def create_streaming_response(openai_stream, request_id: str) -> AsyncGenerator[str, None]:
+async def create_streaming_response(
+    openai_stream, request_id: str
+) -> AsyncGenerator[str, None]:
     """Convert OpenAI streaming response to Server-Sent Events format"""
     try:
         async for chunk in openai_stream:
@@ -46,11 +48,13 @@ async def create_streaming_response(openai_stream, request_id: str) -> AsyncGene
                         {
                             "index": choice.index,
                             "delta": {
-                                "content": choice.delta.content if choice.delta and choice.delta.content else ""
+                                "content": choice.delta.content
+                                if choice.delta and choice.delta.content
+                                else ""
                             },
-                            "finish_reason": choice.finish_reason
+                            "finish_reason": choice.finish_reason,
                         }
-                    ]
+                    ],
                 }
 
                 # Send the chunk in SSE format
@@ -65,7 +69,7 @@ async def create_streaming_response(openai_stream, request_id: str) -> AsyncGene
         error_chunk = {
             "id": request_id,
             "object": "error",
-            "error": {"message": str(e), "type": "stream_error"}
+            "error": {"message": str(e), "type": "stream_error"},
         }
         yield f"data: {json.dumps(error_chunk)}\n\n"
 
@@ -178,7 +182,9 @@ async def completions(request: CedarCompletionRequest):
                             stream=True,
                         )
 
-                        request_id = f"chatcmpl-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                        request_id = (
+                            f"chatcmpl-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                        )
 
                         return StreamingResponse(
                             create_streaming_response(openai_stream, request_id),
@@ -187,15 +193,17 @@ async def completions(request: CedarCompletionRequest):
                                 "Cache-Control": "no-cache",
                                 "Connection": "keep-alive",
                                 "Content-Type": "text/plain; charset=utf-8",
-                            }
+                            },
                         )
                     except Exception as e:
                         raise HTTPException(
-                            status_code=500, detail=f"Streaming completion error: {str(e)}"
+                            status_code=500,
+                            detail=f"Streaming completion error: {str(e)}",
                         )
                 else:
                     raise HTTPException(
-                        status_code=500, detail="OpenAI client not available for streaming"
+                        status_code=500,
+                        detail="OpenAI client not available for streaming",
                     )
             else:
                 # Use regular completion
@@ -454,17 +462,27 @@ async def chat_generate_tags(request: ChatGenerateTagsRequest):
         if not langchain_wrapper.openai_available:
             raise HTTPException(status_code=500, detail="OpenAI client not available")
 
-        # Build context information
+        # Extract context from cedar_state or legacy fields
         context_info = ""
-        if request.additionalContext:
-            context_info += f"Additional Context: {request.additionalContext}\n"
-        if request.currentContext:
-            context_info += f"Current Context: {request.currentContext}\n"
-        if request.chatHistory:
-            context_info += f"Chat History: {request.chatHistory}\n"
+        if request.cedar_state:
+            if request.cedar_state.get('additionalContext'):
+                context_info += f"Additional Context: {request.cedar_state['additionalContext']}\n"
+            if request.cedar_state.get('currentContext'):
+                context_info += f"Current Context: {request.cedar_state['currentContext']}\n"
+            if request.cedar_state.get('chatHistory'):
+                context_info += f"Chat History: {request.cedar_state['chatHistory']}\n"
+        else:
+            # Fallback to legacy fields
+            if request.additionalContext:
+                context_info += f"Additional Context: {request.additionalContext}\n"
+            if request.currentContext:
+                context_info += f"Current Context: {request.currentContext}\n"
+            if request.chatHistory:
+                context_info += f"Chat History: {request.chatHistory}\n"
 
         # Build the prompt with required tag constraint
-        selected_tags_str = ", ".join(request.selectedTags) if request.selectedTags else "none"
+        current_tags = request.current_tags or request.selectedTags or []
+        selected_tags_str = ", ".join(current_tags) if current_tags else "none"
 
         prompt = f"""
 You are an AI assistant helping to generate relevant tags for photos.
@@ -483,16 +501,19 @@ Looking at this image, generate 5-8 relevant and descriptive tags. The tags shou
 Return the tags as a simple JSON array of strings like: ["tag1", "tag2", "tag3"]
 """
 
-        # Call OpenAI Vision API
+        # Call OpenAI Vision API with base64 or URL
+        image_url = request.image_url or request.imageUrl
         result = await langchain_wrapper.call_openai_vision(
             prompt=prompt,
-            image_url=request.imageUrl,
+            image_url=image_url,
+            image_base64=request.image_base64,
             temperature=0.7,
             max_tokens=200,
         )
 
         # Parse the response to extract tags array
         import json
+
         try:
             content = result.get("content", "")
             # Try to extract JSON array from the response
@@ -503,7 +524,7 @@ Return the tags as a simple JSON array of strings like: ["tag1", "tag2", "tag3"]
                 tags = json.loads(tags_json)
             else:
                 # Fallback: extract comma-separated tags
-                tags = [tag.strip().strip('"') for tag in content.split(',')]
+                tags = [tag.strip().strip('"') for tag in content.split(",")]
                 tags = [tag for tag in tags if tag]  # Remove empty strings
         except (json.JSONDecodeError, ValueError, IndexError):
             # Fallback tags if parsing fails
@@ -511,7 +532,9 @@ Return the tags as a simple JSON array of strings like: ["tag1", "tag2", "tag3"]
 
         # Ensure at least one required tag is included
         required_tags = ["food", "hacking", "fun"]
-        has_required = any(tag.lower() in [rt.lower() for rt in required_tags] for tag in tags)
+        has_required = any(
+            tag.lower() in [rt.lower() for rt in required_tags] for tag in tags
+        )
         if not has_required:
             tags.insert(0, "fun")  # Add "fun" as default required tag
 
@@ -519,7 +542,9 @@ Return the tags as a simple JSON array of strings like: ["tag1", "tag2", "tag3"]
 
     except Exception as e:
         logger.error(f"Generate tags error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate tags: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate tags: {str(e)}"
+        )
 
 
 @router.post("/chat/fill-tags")
@@ -529,8 +554,10 @@ async def chat_fill_tags(request: ChatFillTagsRequest):
         if not langchain_wrapper.openai_available:
             raise HTTPException(status_code=500, detail="OpenAI client not available")
 
-        current_tags_str = ", ".join(request.currentTags)
-        remaining_slots = max(0, request.maxTags - len(request.currentTags))
+        current_tags = request.current_tags or request.currentTags or []
+        max_tags = request.max_tags or request.maxTags or 10
+        current_tags_str = ", ".join(current_tags)
+        remaining_slots = max(0, max_tags - len(current_tags))
 
         if remaining_slots == 0:
             return JSONResponse(content={"tags": []})
@@ -548,7 +575,7 @@ async def chat_fill_tags(request: ChatFillTagsRequest):
 You are an AI assistant helping to suggest additional photo tags.
 
 Current tags: {current_tags_str}
-Need {remaining_slots} more tags to reach the maximum of {request.maxTags} tags.
+Need {remaining_slots} more tags to reach the maximum of {max_tags} tags.
 {context_info}
 
 Based on the current tags, suggest {remaining_slots} additional relevant tags that would complement the existing ones. The tags should be:
@@ -572,6 +599,7 @@ Return the tags as a simple JSON array of strings like: ["tag1", "tag2", "tag3"]
 
         # Parse the response
         import json
+
         try:
             content = result.get("content", "")
             start_idx = content.find("[")
@@ -580,13 +608,16 @@ Return the tags as a simple JSON array of strings like: ["tag1", "tag2", "tag3"]
                 tags_json = content[start_idx:end_idx]
                 tags = json.loads(tags_json)
             else:
-                tags = [tag.strip().strip('"') for tag in content.split(',')]
+                tags = [tag.strip().strip('"') for tag in content.split(",")]
                 tags = [tag for tag in tags if tag]
         except (json.JSONDecodeError, ValueError, IndexError):
             # Fallback tags
             required_tags = ["food", "hacking", "fun"]
-            current_lower = [t.lower() for t in request.currentTags]
-            fallback_tag = next((tag for tag in required_tags if tag.lower() not in current_lower), "memories")
+            current_lower = [t.lower() for t in current_tags]
+            fallback_tag = next(
+                (tag for tag in required_tags if tag.lower() not in current_lower),
+                "memories",
+            )
             tags = [fallback_tag]
 
         # Limit to requested number of tags
@@ -606,16 +637,26 @@ async def chat_generate_caption(request: ChatGenerateCaptionRequest):
         if not langchain_wrapper.openai_available:
             raise HTTPException(status_code=500, detail="OpenAI client not available")
 
-        # Build context information
+        # Extract context from cedar_state or legacy fields
         context_info = ""
-        if request.additionalContext:
-            context_info += f"Additional Context: {request.additionalContext}\n"
-        if request.currentContext:
-            context_info += f"Current Context: {request.currentContext}\n"
-        if request.chatHistory:
-            context_info += f"Chat History: {request.chatHistory}\n"
+        if request.cedar_state:
+            if request.cedar_state.get('additionalContext'):
+                context_info += f"Additional Context: {request.cedar_state['additionalContext']}\n"
+            if request.cedar_state.get('currentContext'):
+                context_info += f"Current Context: {request.cedar_state['currentContext']}\n"
+            if request.cedar_state.get('chatHistory'):
+                context_info += f"Chat History: {request.cedar_state['chatHistory']}\n"
+        else:
+            # Fallback to legacy fields
+            if request.additionalContext:
+                context_info += f"Additional Context: {request.additionalContext}\n"
+            if request.currentContext:
+                context_info += f"Current Context: {request.currentContext}\n"
+            if request.chatHistory:
+                context_info += f"Chat History: {request.chatHistory}\n"
 
-        tags_str = ", ".join(request.currentTags) if request.currentTags else "none"
+        tags = request.tags or request.currentTags or []
+        tags_str = ", ".join(tags) if tags else "none"
         filename_info = f"Filename: {request.filename}" if request.filename else ""
 
         prompt = f"""
@@ -635,10 +676,12 @@ Looking at this image, generate a captivating and descriptive caption that:
 Generate just the caption text, nothing else.
 """
 
-        # Call OpenAI Vision API
+        # Call OpenAI Vision API with base64 or URL
+        image_url = request.image_url or request.imageUrl
         result = await langchain_wrapper.call_openai_vision(
             prompt=prompt,
-            image_url=request.imageUrl,
+            image_url=image_url,
+            image_base64=request.image_base64,
             temperature=0.8,
             max_tokens=100,
         )
@@ -653,7 +696,9 @@ Generate just the caption text, nothing else.
 
     except Exception as e:
         logger.error(f"Generate caption error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate caption: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate caption: {str(e)}"
+        )
 
 
 @router.post("/chat/fill-caption")
@@ -663,21 +708,30 @@ async def chat_fill_caption(request: ChatFillCaptionRequest):
         if not langchain_wrapper.openai_available:
             raise HTTPException(status_code=500, detail="OpenAI client not available")
 
-        # Build context information
+        # Extract context from cedar_state or legacy fields
         context_info = ""
-        if request.additionalContext:
-            context_info += f"Additional Context: {request.additionalContext}\n"
-        if request.currentContext:
-            context_info += f"Current Context: {request.currentContext}\n"
-        if request.chatHistory:
-            context_info += f"Chat History: {request.chatHistory}\n"
+        if request.cedar_state:
+            if request.cedar_state.get('additionalContext'):
+                context_info += f"Additional Context: {request.cedar_state['additionalContext']}\n"
+            if request.cedar_state.get('currentContext'):
+                context_info += f"Current Context: {request.cedar_state['currentContext']}\n"
+            if request.cedar_state.get('chatHistory'):
+                context_info += f"Chat History: {request.cedar_state['chatHistory']}\n"
+        else:
+            # Fallback to legacy fields
+            if request.additionalContext:
+                context_info += f"Additional Context: {request.additionalContext}\n"
+            if request.currentContext:
+                context_info += f"Current Context: {request.currentContext}\n"
+            if request.chatHistory:
+                context_info += f"Chat History: {request.chatHistory}\n"
 
         tags_str = ", ".join(request.tags) if request.tags else "none"
 
         prompt = f"""
 You are an AI assistant helping to enhance photo captions.
 
-Current caption: "{request.currentCaption}"
+Current caption: "{request.current_caption or request.currentCaption}"
 Tags: {tags_str}
 {context_info}
 
@@ -693,11 +747,13 @@ If the current caption is already good, you can make minor improvements or keep 
 Return just the enhanced caption text, nothing else.
 """
 
-        # Use image URL if provided for visual context
-        if request.imageUrl:
+        # Use image URL or base64 if provided for visual context
+        image_url = request.image_url or request.imageUrl
+        if image_url or request.image_base64:
             result = await langchain_wrapper.call_openai_vision(
                 prompt=prompt,
-                image_url=request.imageUrl,
+                image_url=image_url,
+                image_base64=request.image_base64,
                 temperature=0.7,
                 max_tokens=150,
             )
@@ -720,4 +776,6 @@ Return just the enhanced caption text, nothing else.
 
     except Exception as e:
         logger.error(f"Fill caption error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to enhance caption: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to enhance caption: {str(e)}"
+        )

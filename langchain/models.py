@@ -646,45 +646,133 @@ class CedarCompletionRequest(BaseModel):
     userId: Optional[str] = None
     threadId: Optional[str] = None
 
+    def validate_request(self) -> bool:
+        if not self.messages:
+            return False
+        return True
+
 
 class ChatGenerateTagsRequest(BaseModel):
     """Request model for generating photo tags"""
 
-    imageUrl: str
-    selectedTags: List[str] = []
+    image_url: Optional[str] = None
+    image_base64: Optional[str] = None
+    current_tags: List[str] = []
+    cedar_state: Optional[Dict[str, Any]] = None
+
+    # Legacy fields for backward compatibility
+    imageUrl: Optional[str] = None
+    selectedTags: Optional[List[str]] = None
     additionalContext: Optional[Dict[str, Any]] = None
     currentContext: Optional[Dict[str, Any]] = None
     chatHistory: Optional[List[Dict[str, Any]]] = None
+
+    def model_post_init(self, __context=None) -> None:
+        """Handle legacy field mapping"""
+        # Map legacy fields to new ones if new ones aren't provided
+        if not self.image_url and self.imageUrl:
+            self.image_url = self.imageUrl
+        if not self.current_tags and self.selectedTags:
+            self.current_tags = self.selectedTags
+        if not self.cedar_state:
+            self.cedar_state = {
+                'additionalContext': self.additionalContext,
+                'currentContext': self.currentContext,
+                'chatHistory': self.chatHistory
+            }
 
 
 class ChatFillTagsRequest(BaseModel):
     """Request model for filling remaining photo tags"""
 
-    currentTags: List[str]
-    maxTags: int
+    image_url: Optional[str] = None
+    image_base64: Optional[str] = None
+    current_tags: List[str]
+    max_tags: int
+    needed_tags: Optional[List[str]] = None
+    cedar_state: Optional[Dict[str, Any]] = None
+
+    # Legacy fields for backward compatibility
+    currentTags: Optional[List[str]] = None
+    maxTags: Optional[int] = None
     additionalContext: Optional[Dict[str, Any]] = None
     currentContext: Optional[Dict[str, Any]] = None
     chatHistory: Optional[List[Dict[str, Any]]] = None
+
+    def model_post_init(self, __context=None) -> None:
+        """Handle legacy field mapping"""
+        # Map legacy fields to new ones if new ones aren't provided
+        if not self.current_tags and self.currentTags:
+            self.current_tags = self.currentTags
+        if not self.max_tags and self.maxTags:
+            self.max_tags = self.maxTags
+        if not self.cedar_state:
+            self.cedar_state = {
+                'additionalContext': self.additionalContext,
+                'currentContext': self.currentContext,
+                'chatHistory': self.chatHistory
+            }
 
 
 class ChatGenerateCaptionRequest(BaseModel):
     """Request model for generating photo captions"""
 
-    imageUrl: str
-    currentTags: List[str] = []
+    image_url: Optional[str] = None
+    image_base64: Optional[str] = None
+    tags: List[str] = []
     filename: Optional[str] = None
+    cedar_state: Optional[Dict[str, Any]] = None
+
+    # Legacy fields for backward compatibility
+    imageUrl: Optional[str] = None
+    currentTags: Optional[List[str]] = None
     additionalContext: Optional[Dict[str, Any]] = None
     currentContext: Optional[Dict[str, Any]] = None
     chatHistory: Optional[List[Dict[str, Any]]] = None
+
+    def model_post_init(self, __context=None) -> None:
+        """Handle legacy field mapping"""
+        # Map legacy fields to new ones if new ones aren't provided
+        if not self.image_url and self.imageUrl:
+            self.image_url = self.imageUrl
+        if not self.tags and self.currentTags:
+            self.tags = self.currentTags
+        if not self.cedar_state:
+            self.cedar_state = {
+                'additionalContext': self.additionalContext,
+                'currentContext': self.currentContext,
+                'chatHistory': self.chatHistory
+            }
 
 
 class ChatFillCaptionRequest(BaseModel):
     """Request model for filling/enhancing photo captions"""
 
-    currentCaption: str
+    current_caption: str
+    image_url: Optional[str] = None
+    image_base64: Optional[str] = None
+    tags: List[str] = []
+    filename: Optional[str] = None
+    cedar_state: Optional[Dict[str, Any]] = None
+
+    # Legacy fields for backward compatibility
+    currentCaption: Optional[str] = None
     imageData: Optional[Dict[str, Any]] = None
     imageUrl: Optional[str] = None
-    tags: List[str] = []
     additionalContext: Optional[Dict[str, Any]] = None
     currentContext: Optional[Dict[str, Any]] = None
     chatHistory: Optional[List[Dict[str, Any]]] = None
+
+    def model_post_init(self, __context=None) -> None:
+        """Handle legacy field mapping"""
+        # Map legacy fields to new ones if new ones aren't provided
+        if not self.current_caption and self.currentCaption:
+            self.current_caption = self.currentCaption
+        if not self.image_url and self.imageUrl:
+            self.image_url = self.imageUrl
+        if not self.cedar_state:
+            self.cedar_state = {
+                'additionalContext': self.additionalContext,
+                'currentContext': self.currentContext,
+                'chatHistory': self.chatHistory
+            }
