@@ -37,6 +37,35 @@ def convert_dms_to_decimal(dms, ref):
         decimal_degrees *= -1
     return decimal_degrees
 
+def generate_plaque_image(text: str, plaque_id: str):
+    img_width = 800
+    img_height = 400
+    background_color = (139, 69, 19)  # Brown color (RGB)
+    text_color = (255, 255, 255)  # White color (RGB)
+
+    img = Image.new('RGB', (img_width, img_height), color=background_color)
+    d = ImageDraw.Draw(img)
+
+    try:
+        font = ImageFont.truetype("./TheSeasons.ttf", 65)
+    except IOError:
+        font = ImageFont.load_default() # Fallback to default font
+
+    # Calculate text size and position
+    text_bbox = d.textbbox((0,0), text, font=font)
+    text_width = text_bbox[2] - text_bbox[0]
+    text_height = text_bbox[3] - text_bbox[1]
+    
+    x = (img_width - text_width) / 2
+    y = (img_height - text_height) / 2
+
+    d.text((x, y), text, fill=text_color, font=font)
+
+    # Save the plaque to a temporary file
+    plaque_temp_file_path = os.path.join(tempfile.gettempdir(), f"plaque_{plaque_id}.png")
+    img.save(plaque_temp_file_path, format='PNG')
+    return plaque_temp_file_path
+
 def apply_frame_to_image(image_path: str, frame_path: str = "./frame.png"):
     try:
         # Open the original image
@@ -127,6 +156,7 @@ def initialize_db():
         cur.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS exif_gps_info TEXT DEFAULT NULL;")
         cur.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS caption TEXT DEFAULT NULL;")
         cur.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS orientation VARCHAR(10) DEFAULT NULL;")
+        cur.execute("ALTER TABLE photos ADD COLUMN IF NOT EXISTS plaque_url TEXT DEFAULT NULL;")
 
         # Modify photo_likes table to allow multiple likes per user per photo
         cur.execute("ALTER TABLE photo_likes DROP CONSTRAINT IF EXISTS photo_likes_pkey;") # Drop existing PK
@@ -196,6 +226,13 @@ async def upload_photo(
         s3_object_name = uuid_photo_with_extension
         public_url = upload_file_to_s3(temp_file_path, s3_object_name)
         
+        plaque_url = None
+        if caption:
+            plaque_temp_file_path = generate_plaque_image(caption, uuid_photo)
+            plaque_s3_object_name = f"P_{uuid_photo}.png"
+            plaque_url = upload_file_to_s3(plaque_temp_file_path, plaque_s3_object_name)
+            os.remove(plaque_temp_file_path) # Clean up temporary plaque file
+
         if not public_url:
             raise HTTPException(status_code=500, detail="Failed to upload file or get public URL")
         
@@ -211,8 +248,8 @@ async def upload_photo(
         cur = conn.cursor()
         try:
             cur.execute(
-                "INSERT INTO photos (id, filename, url, tags, user_id, likes, exif_gps_info, caption, orientation) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                (uuid_photo, new_filename, public_url, tags, user_id, 0, exif_gps_info, caption, orientation)
+                "INSERT INTO photos (id, filename, url, tags, user_id, likes, exif_gps_info, caption, orientation, plaque_url) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (uuid_photo, new_filename, public_url, tags, user_id, 0, exif_gps_info, caption, orientation, plaque_url)
             )
             conn.commit()
         except psycopg2.Error as e:
@@ -223,7 +260,7 @@ async def upload_photo(
             conn.close()
         
         print(f"UUID: {uuid_photo_with_extension}")
-        return {"id": uuid_photo, "filename": new_filename, "url": public_url, "tags": tags, "user_id": user_id, "likes": 0, "exif_gps_info": json.loads(exif_gps_info) if exif_gps_info else None, "caption": caption, "orientation": orientation}
+        return {"id": uuid_photo, "filename": new_filename, "url": public_url, "tags": tags, "user_id": user_id, "likes": 0, "exif_gps_info": json.loads(exif_gps_info) if exif_gps_info else None, "caption": caption, "orientation": orientation, "plaque_url": plaque_url, "plaque_id": f"P_{uuid_photo}" if caption else None}
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
@@ -235,7 +272,7 @@ async def get_photo(image_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption, orientation FROM photos WHERE id = %s", (image_id,))
+        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption, orientation, plaque_url FROM photos WHERE id = %s", (image_id,))
         photo = cur.fetchone()
         if photo:
             return {
@@ -247,7 +284,9 @@ async def get_photo(image_id: str):
                 "likes": photo[5],
                 "exif_gps_info": json.loads(photo[6]) if photo[6] else None,
                 "caption": photo[7],
-                "is_vertical": True if photo[8] == "vertical" else False
+                "is_vertical": True if photo[8] == "vertical" else False,
+                "plaque_url": photo[9],
+                "plaque_id": f"P_{photo[0]}" if photo[9] else None
             }
         else:
             raise HTTPException(status_code=404, detail="Image not found in database")
@@ -262,7 +301,7 @@ async def get_all_photos():
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption, orientation FROM photos ORDER BY upload_date DESC")
+        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption, orientation, plaque_url FROM photos ORDER BY upload_date DESC")
         rows = cur.fetchall()
         columns = [col[0] for col in cur.description]
         photos = []
@@ -276,7 +315,9 @@ async def get_all_photos():
                 "likes": row[5],
                 "exif_gps_info": json.loads(row[6]) if row[6] else None,
                 "caption": row[7],
-                "is_vertical": True if row[8] == "vertical" else False
+                "is_vertical": True if row[8] == "vertical" else False,
+                "plaque_url": row[9],
+                "plaque_id": f"P_{row[0]}" if row[9] else None
             })
         return {"photos": photos}
     except psycopg2.Error as e:
@@ -290,7 +331,7 @@ async def get_photos_by_user(user_id: str):
     conn = get_db_connection()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption, orientation FROM photos WHERE user_id = %s", (user_id,))
+        cur.execute("SELECT id, filename, url, tags, user_id, likes, exif_gps_info, caption, orientation, plaque_url FROM photos WHERE user_id = %s", (user_id,))
         rows = cur.fetchall()
         columns = [col[0] for col in cur.description]
         photos = []
@@ -304,7 +345,9 @@ async def get_photos_by_user(user_id: str):
                 "likes": row[5],
                 "exif_gps_info": json.loads(row[6]) if row[6] else None,
                 "caption": row[7],
-                "is_vertical": True if row[8] == "vertical" else False
+                "is_vertical": True if row[8] == "vertical" else False,
+                "plaque_url": row[9],
+                "plaque_id": f"P_{row[0]}" if row[9] else None
             })
         return {"photos": photos}
     except psycopg2.Error as e:
@@ -420,7 +463,7 @@ async def get_image_with_text(text: str = "Hello, World!"):
     d = ImageDraw.Draw(img)
 
     try:
-        font = ImageFont.truetype("./TheSeasons.otf", 40)
+        font = ImageFont.truetype("./TheSeasons.ttf", 90)
     except IOError:
         font = ImageFont.load_default() # Fallback to default font
 
