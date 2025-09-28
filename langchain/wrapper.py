@@ -176,7 +176,6 @@ class LangChainAPIWrapper:
         self,
         prompt: str,
         image_url: Optional[str] = None,
-        image_base64: Optional[str] = None,
         model: str = "gpt-4o",
         max_tokens: int = 300,
         **kwargs,
@@ -187,7 +186,6 @@ class LangChainAPIWrapper:
         Args:
             prompt: Text prompt describing what to analyze
             image_url: URL of the image to analyze
-            image_base64: Base64 encoded image data
             model: OpenAI vision model to use
             max_tokens: Maximum tokens to generate
             **kwargs: Additional OpenAI API parameters
@@ -200,17 +198,11 @@ class LangChainAPIWrapper:
                 "OpenAI Vision client not available. Check API key and installation."
             )
 
-        if not image_url and not image_base64:
-            raise ValueError("Either image_url or image_base64 must be provided")
+        if not image_url:
+            raise ValueError("Either image_url must be provided")
 
         # Prepare the image content
-        if image_url:
-            image_content = {"type": "image_url", "image_url": {"url": image_url}}
-        else:
-            image_content = {
-                "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"},
-            }
+        image_content = {"type": "image_url", "image_url": {"url": image_url}}
 
         messages = [
             {
