@@ -19,6 +19,7 @@ from langchain.models import (
     ChatFillTagsRequest,
     ChatGenerateCaptionRequest,
     ChatFillCaptionRequest,
+    ChatFilterImagesRequest,
 )
 
 router = APIRouter(prefix="/langchain", tags=["LangChain"])
@@ -165,6 +166,7 @@ async def reset_service():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Reset error: {str(e)}")
 
+
 # Chat endpoints for frontend integration
 @router.post("/chat/generate-tags")
 async def chat_generate_tags(request: ChatGenerateTagsRequest):
@@ -190,6 +192,24 @@ async def chat_fill_caption(request: ChatFillCaptionRequest):
     return await chat_handlers.fill_caption(request)
 
 
+@router.post("/chat/filter_images")
+async def chat_filter_images(request: ChatFilterImagesRequest):
+    """Filter images using cedar chat state and active filters provided by frontend"""
+    # Forward to chat handlers - implementation may be added later
+    try:
+        if not hasattr(chat_handlers, "filter_images"):
+            # Placeholder behaviour: return the activeFilters back so frontend can proceed
+            return JSONResponse(
+                content={"filters": request.activeFilters or {}}, status_code=200
+            )
+
+        return await chat_handlers.filter_images(request)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to filter images: {str(e)}"
+        )
+
+
 # Context management endpoints
 @router.post("/chat/set-image")
 async def chat_set_image(image_url: str):
@@ -211,7 +231,7 @@ async def get_chat_context():
             "current_tags": shared_context.current_tags,
             "current_caption": shared_context.current_caption,
             "conversation_history_count": len(shared_context.conversation_history),
-            "context_summary": shared_context.get_context_summary()
+            "context_summary": shared_context.get_context_summary(),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get context: {str(e)}")
