@@ -165,3 +165,12 @@ tags
 [2025-09-27 22:15:15] [[32mINFO[0m] [langchain.wrapper] OpenAI client initialized successfully
 [2025-09-27 22:15:53] [[31mERROR[0m] [langchain.wrapper] OpenAI vision API call failed: Error code: 400 - {'error': {'message': 'Failed to download image from blob:http://localhost:3000/17e67719-0ce0-4357-b186-ae35f4f60cf8. Image URL is invalid.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_url'}}
 [2025-09-27 22:15:57] [[31mERROR[0m] [langchain.wrapper] OpenAI vision API call failed: Error code: 400 - {'error': {'message': 'Failed to download image from blob:http://localhost:3000/17e67719-0ce0-4357-b186-ae35f4f60cf8. Image URL is invalid.', 'type': 'invalid_request_error', 'param': None, 'code': 'invalid_image_url'}}
+[2025-09-27 23:36:25] [[32mINFO[0m] [langchain.wrapper] OpenAI client initialized successfully
+[2025-09-27 23:36:31] [[32mINFO[0m] [langchain.wrapper] OpenAI client initialized successfully
+[2025-09-27 23:36:31] [[32mINFO[0m] [langchain.wrapper] OpenAI client initialized successfully
+[2025-09-27 23:36:35] [[32mINFO[0m] [langchain.wrapper] OpenAI client initialized successfully
+[2025-09-27 23:36:40] [[32mINFO[0m] [langchain.wrapper] OpenAI client initialized successfully
+[2025-09-27 23:36:42] [[32mINFO[0m] [langchain.wrapper] OpenAI client initialized successfully
+[2025-09-27 23:36:44] [[32mINFO[0m] [langchain.wrapper] OpenAI client initialized successfully
+[2025-09-27 23:36:50] [[32mINFO[0m] [langchain.wrapper] OpenAI client initialized successfully
+[2025-09-27 23:36:50] [[32mINFO[0m] [langchain.wrapper] OpenAI client initialized successfully
