@@ -632,3 +632,101 @@ class FilterGenerationResponse(BaseModel):
             ]
         }
     }
+
+
+class CedarCompletionRequest(BaseModel):
+    """Request model for Cedar LangChain completions"""
+
+    messages: List[Dict[str, Any]]
+    temperature: float = 0.7
+    max_tokens: int = 1000
+    stream: bool = False
+    response_format: Optional[Dict[str, Any]] = None
+    additionalContext: Optional[Dict[str, Any]] = None
+    userId: Optional[str] = None
+    threadId: Optional[str] = None
+
+    def validate_request(self) -> bool:
+        """Validate the completion request"""
+        # Check if messages is provided and not empty
+        if not self.messages or len(self.messages) == 0:
+            logger.error("Validation failed: messages cannot be empty")
+            return False
+
+        # Check if there's at least one user message
+        user_messages = [msg for msg in self.messages if msg.get("role") == "user"]
+        if not user_messages:
+            logger.error("Validation failed: at least one user message is required")
+            return False
+
+        # Validate temperature range
+        if not (0.0 <= self.temperature <= 2.0):
+            logger.error(
+                f"Validation failed: temperature must be between 0.0 and 2.0, got {self.temperature}"
+            )
+            return False
+
+        # Validate max_tokens
+        if self.max_tokens < 1 or self.max_tokens > 4096:
+            logger.error(
+                f"Validation failed: max_tokens must be between 1 and 4096, got {self.max_tokens}"
+            )
+            return False
+
+        return True
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "title": "Simple Text Completion",
+                    "description": "Basic text completion request",
+                    "value": {
+                        "messages": [
+                            {"role": "user", "content": "Hello, how are you?"}
+                        ],
+                        "temperature": 0.7,
+                        "max_tokens": 1000,
+                        "stream": False,
+                        "additionalContext": None,
+                        "threadId": "thread_123",
+                    },
+                },
+                {
+                    "title": "Image Analysis Request",
+                    "description": "Completion request with uploaded image",
+                    "value": {
+                        "messages": [
+                            {"role": "user", "content": "What's in this image?"}
+                        ],
+                        "temperature": 0.7,
+                        "max_tokens": 1000,
+                        "stream": False,
+                        "additionalContext": {
+                            "uploaded_image_1": {
+                                "data": {"url": "https://example.com/image.jpg"}
+                            }
+                        },
+                        "threadId": "thread_456",
+                    },
+                },
+                {
+                    "title": "Streaming Request",
+                    "description": "Streaming completion request",
+                    "value": {
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": "You are a helpful assistant.",
+                            },
+                            {"role": "user", "content": "Tell me a story."},
+                        ],
+                        "temperature": 0.8,
+                        "max_tokens": 2000,
+                        "stream": True,
+                        "threadId": "thread_789",
+                    },
+                },
+            ]
+        }
+    }

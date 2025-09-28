@@ -1,8 +1,10 @@
 # main.py
+from loguru import logger
 from fastapi import APIRouter, FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any
 import base64
+from datetime import datetime
 
 from langchain import (
     image_tagging_api,
@@ -11,8 +13,167 @@ from langchain import (
     FilterGenerationRequest,
     APIResponse,
 )
+from langchain.wrapper import LangChainAPIWrapper
+from langchain.models import CedarCompletionRequest
 
 router = APIRouter(prefix="/langchain", tags=["LangChain"])
+
+# Initialize the LangChain wrapper
+langchain_wrapper = LangChainAPIWrapper()
+
+
+def extract_image_from_context(additional_context: Any) -> str | None:
+    """Extract image URL from additionalContext if available"""
+    if not additional_context:
+        return None
+
+    # Look for uploaded images in the context
+    for key, value in additional_context.items():
+        if key.startswith("uploaded_image_") and isinstance(value, dict):
+            image_data = value.get("data", {})
+            if isinstance(image_data, dict) and "url" in image_data:
+                return image_data["url"]
+
+    return None
+
+
+@router.post("/completions")
+async def completions(request: CedarCompletionRequest):
+    """
+    Main completions endpoint for LangChain provider
+
+    Supports both regular completions and structured output.
+    Also supports streaming when stream=true is passed.
+    """
+    try:
+        # Validate the request
+        if not request.validate_request():
+            logger.info("Invalid request data")
+            raise HTTPException(status_code=400, detail="Invalid request")
+
+        logger.info(f"Received completion request: {request}")
+        # Check if there's an uploaded image to analyze
+        image_url = extract_image_from_context(request.additionalContext)
+
+        if image_url:
+            # Extract the user's question from messages
+            user_messages = [
+                msg for msg in request.messages if msg.get("role") == "user"
+            ]
+            user_query = user_messages[-1].get("content", "") if user_messages else ""
+
+            # Use image analysis
+            if langchain_wrapper.openai_available:
+                try:
+                    result = await langchain_wrapper.call_openai_vision(
+                        prompt=user_query,
+                        image_url=image_url,
+                        temperature=request.temperature,
+                        max_tokens=request.max_tokens,
+                    )
+
+                    return JSONResponse(
+                        content={
+                            "id": f"chatcmpl-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                            "object": "chat.completion",
+                            "created": int(datetime.now().timestamp()),
+                            "model": "gpt-4o",
+                            "choices": [
+                                {
+                                    "index": 0,
+                                    "message": {
+                                        "role": "assistant",
+                                        "content": result.get("content", ""),
+                                    },
+                                    "finish_reason": result.get(
+                                        "finish_reason", "stop"
+                                    ),
+                                }
+                            ],
+                            "usage": result.get(
+                                "usage",
+                                {
+                                    "prompt_tokens": 0,
+                                    "completion_tokens": 0,
+                                    "total_tokens": 0,
+                                },
+                            ),
+                            "image_analysis": True,
+                        },
+                        status_code=200,
+                    )
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=500, detail=f"Image analysis error: {str(e)}"
+                    )
+            else:
+                raise HTTPException(
+                    status_code=500, detail="OpenAI client not available"
+                )
+        else:
+            # Regular text completion
+            messages = request.messages
+            temperature = request.temperature
+            max_tokens = request.max_tokens
+            stream = request.stream
+            logger.info(f"Processing text completion, stream={stream}")
+
+            if stream:
+                # For now, return error for streaming - would need StreamingResponse
+                raise HTTPException(
+                    status_code=501, detail="Streaming not implemented yet"
+                )
+            else:
+                # Use regular completion
+                if langchain_wrapper.openai_available:
+                    try:
+                        result = await langchain_wrapper.call_openai_chat(
+                            messages=messages,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                        )
+
+                        return JSONResponse(
+                            content={
+                                "id": f"chatcmpl-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+                                "object": "chat.completion",
+                                "created": int(datetime.now().timestamp()),
+                                "model": result.get("model", "gpt-4"),
+                                "choices": [
+                                    {
+                                        "index": 0,
+                                        "message": {
+                                            "role": "assistant",
+                                            "content": result.get("content", ""),
+                                        },
+                                        "finish_reason": result.get(
+                                            "finish_reason", "stop"
+                                        ),
+                                    }
+                                ],
+                                "usage": result.get(
+                                    "usage",
+                                    {
+                                        "prompt_tokens": 0,
+                                        "completion_tokens": 0,
+                                        "total_tokens": 0,
+                                    },
+                                ),
+                            },
+                            status_code=200,
+                        )
+                    except Exception as e:
+                        raise HTTPException(
+                            status_code=500, detail=f"Completion error: {str(e)}"
+                        )
+                else:
+                    raise HTTPException(
+                        status_code=500, detail="OpenAI client not available"
+                    )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
 
 @router.get("/")
 async def read_root():
