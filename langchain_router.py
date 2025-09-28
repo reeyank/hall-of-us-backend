@@ -15,7 +15,13 @@ from langchain import (
     APIResponse,
 )
 from langchain.wrapper import LangChainAPIWrapper
-from langchain.models import CedarCompletionRequest
+from langchain.models import (
+    CedarCompletionRequest,
+    ChatGenerateTagsRequest,
+    ChatFillTagsRequest,
+    ChatGenerateCaptionRequest,
+    ChatFillCaptionRequest,
+)
 
 router = APIRouter(prefix="/langchain", tags=["LangChain"])
 
@@ -438,3 +444,280 @@ async def test_filter_generation():
     )
 
     return await generate_filters(sample_request)
+
+
+# Chat endpoints for frontend integration
+@router.post("/chat/generate-tags")
+async def chat_generate_tags(request: ChatGenerateTagsRequest):
+    """Generate photo tags with at least one from required categories"""
+    try:
+        if not langchain_wrapper.openai_available:
+            raise HTTPException(status_code=500, detail="OpenAI client not available")
+
+        # Build context information
+        context_info = ""
+        if request.additionalContext:
+            context_info += f"Additional Context: {request.additionalContext}\n"
+        if request.currentContext:
+            context_info += f"Current Context: {request.currentContext}\n"
+        if request.chatHistory:
+            context_info += f"Chat History: {request.chatHistory}\n"
+
+        # Build the prompt with required tag constraint
+        selected_tags_str = ", ".join(request.selectedTags) if request.selectedTags else "none"
+
+        prompt = f"""
+You are an AI assistant helping to generate relevant tags for photos.
+
+IMPORTANT CONSTRAINT: At least one of the tags you generate MUST be from this list: "food", "hacking", or "fun".
+
+Current selected tags: {selected_tags_str}
+{context_info}
+
+Looking at this image, generate 5-8 relevant and descriptive tags. The tags should be:
+- Descriptive of what's actually in the image
+- Relevant for photo organization and searching
+- Include at least one tag from: "food", "hacking", or "fun"
+- Avoid duplicating already selected tags: {selected_tags_str}
+
+Return the tags as a simple JSON array of strings like: ["tag1", "tag2", "tag3"]
+"""
+
+        # Call OpenAI Vision API
+        result = await langchain_wrapper.call_openai_vision(
+            prompt=prompt,
+            image_url=request.imageUrl,
+            temperature=0.7,
+            max_tokens=200,
+        )
+
+        # Parse the response to extract tags array
+        import json
+        try:
+            content = result.get("content", "")
+            # Try to extract JSON array from the response
+            start_idx = content.find("[")
+            end_idx = content.rfind("]") + 1
+            if start_idx != -1 and end_idx != -1:
+                tags_json = content[start_idx:end_idx]
+                tags = json.loads(tags_json)
+            else:
+                # Fallback: extract comma-separated tags
+                tags = [tag.strip().strip('"') for tag in content.split(',')]
+                tags = [tag for tag in tags if tag]  # Remove empty strings
+        except (json.JSONDecodeError, ValueError, IndexError):
+            # Fallback tags if parsing fails
+            tags = ["fun", "photo", "memories"]
+
+        # Ensure at least one required tag is included
+        required_tags = ["food", "hacking", "fun"]
+        has_required = any(tag.lower() in [rt.lower() for rt in required_tags] for tag in tags)
+        if not has_required:
+            tags.insert(0, "fun")  # Add "fun" as default required tag
+
+        return JSONResponse(content={"tags": tags})
+
+    except Exception as e:
+        logger.error(f"Generate tags error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate tags: {str(e)}")
+
+
+@router.post("/chat/fill-tags")
+async def chat_fill_tags(request: ChatFillTagsRequest):
+    """Fill remaining tag slots with relevant suggestions"""
+    try:
+        if not langchain_wrapper.openai_available:
+            raise HTTPException(status_code=500, detail="OpenAI client not available")
+
+        current_tags_str = ", ".join(request.currentTags)
+        remaining_slots = max(0, request.maxTags - len(request.currentTags))
+
+        if remaining_slots == 0:
+            return JSONResponse(content={"tags": []})
+
+        # Build context information
+        context_info = ""
+        if request.additionalContext:
+            context_info += f"Additional Context: {request.additionalContext}\n"
+        if request.currentContext:
+            context_info += f"Current Context: {request.currentContext}\n"
+        if request.chatHistory:
+            context_info += f"Chat History: {request.chatHistory}\n"
+
+        prompt = f"""
+You are an AI assistant helping to suggest additional photo tags.
+
+Current tags: {current_tags_str}
+Need {remaining_slots} more tags to reach the maximum of {request.maxTags} tags.
+{context_info}
+
+Based on the current tags, suggest {remaining_slots} additional relevant tags that would complement the existing ones. The tags should be:
+- Related to the current theme/subject
+- Useful for photo organization
+- Different from existing tags
+- General enough to be useful
+
+IMPORTANT: At least one of your suggestions should be from: "food", "hacking", or "fun" (if not already present in current tags).
+
+Return the tags as a simple JSON array of strings like: ["tag1", "tag2", "tag3"]
+"""
+
+        # Call OpenAI Chat API for text completion
+        messages = [{"role": "user", "content": prompt}]
+        result = await langchain_wrapper.call_openai_chat(
+            messages=messages,
+            temperature=0.6,
+            max_tokens=150,
+        )
+
+        # Parse the response
+        import json
+        try:
+            content = result.get("content", "")
+            start_idx = content.find("[")
+            end_idx = content.rfind("]") + 1
+            if start_idx != -1 and end_idx != -1:
+                tags_json = content[start_idx:end_idx]
+                tags = json.loads(tags_json)
+            else:
+                tags = [tag.strip().strip('"') for tag in content.split(',')]
+                tags = [tag for tag in tags if tag]
+        except (json.JSONDecodeError, ValueError, IndexError):
+            # Fallback tags
+            required_tags = ["food", "hacking", "fun"]
+            current_lower = [t.lower() for t in request.currentTags]
+            fallback_tag = next((tag for tag in required_tags if tag.lower() not in current_lower), "memories")
+            tags = [fallback_tag]
+
+        # Limit to requested number of tags
+        tags = tags[:remaining_slots]
+
+        return JSONResponse(content={"tags": tags})
+
+    except Exception as e:
+        logger.error(f"Fill tags error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fill tags: {str(e)}")
+
+
+@router.post("/chat/generate-caption")
+async def chat_generate_caption(request: ChatGenerateCaptionRequest):
+    """Generate a caption for the photo"""
+    try:
+        if not langchain_wrapper.openai_available:
+            raise HTTPException(status_code=500, detail="OpenAI client not available")
+
+        # Build context information
+        context_info = ""
+        if request.additionalContext:
+            context_info += f"Additional Context: {request.additionalContext}\n"
+        if request.currentContext:
+            context_info += f"Current Context: {request.currentContext}\n"
+        if request.chatHistory:
+            context_info += f"Chat History: {request.chatHistory}\n"
+
+        tags_str = ", ".join(request.currentTags) if request.currentTags else "none"
+        filename_info = f"Filename: {request.filename}" if request.filename else ""
+
+        prompt = f"""
+You are an AI assistant helping to generate engaging captions for photos.
+
+Current tags: {tags_str}
+{filename_info}
+{context_info}
+
+Looking at this image, generate a captivating and descriptive caption that:
+- Describes what's happening in the image
+- Captures the mood or atmosphere
+- Is engaging and social media friendly
+- Is 1-2 sentences long
+- Incorporates relevant context from the tags when appropriate
+
+Generate just the caption text, nothing else.
+"""
+
+        # Call OpenAI Vision API
+        result = await langchain_wrapper.call_openai_vision(
+            prompt=prompt,
+            image_url=request.imageUrl,
+            temperature=0.8,
+            max_tokens=100,
+        )
+
+        caption = result.get("content", "").strip()
+
+        # Clean up the caption (remove quotes if present)
+        if caption.startswith('"') and caption.endswith('"'):
+            caption = caption[1:-1]
+
+        return JSONResponse(content={"caption": caption})
+
+    except Exception as e:
+        logger.error(f"Generate caption error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate caption: {str(e)}")
+
+
+@router.post("/chat/fill-caption")
+async def chat_fill_caption(request: ChatFillCaptionRequest):
+    """Enhance or fill out an existing caption"""
+    try:
+        if not langchain_wrapper.openai_available:
+            raise HTTPException(status_code=500, detail="OpenAI client not available")
+
+        # Build context information
+        context_info = ""
+        if request.additionalContext:
+            context_info += f"Additional Context: {request.additionalContext}\n"
+        if request.currentContext:
+            context_info += f"Current Context: {request.currentContext}\n"
+        if request.chatHistory:
+            context_info += f"Chat History: {request.chatHistory}\n"
+
+        tags_str = ", ".join(request.tags) if request.tags else "none"
+
+        prompt = f"""
+You are an AI assistant helping to enhance photo captions.
+
+Current caption: "{request.currentCaption}"
+Tags: {tags_str}
+{context_info}
+
+Please enhance this caption by:
+- Making it more engaging and descriptive
+- Adding relevant details that complement the existing caption
+- Keeping the original tone and style
+- Making it 1-3 sentences long
+- Incorporating relevant context from tags when appropriate
+
+If the current caption is already good, you can make minor improvements or keep it mostly the same.
+
+Return just the enhanced caption text, nothing else.
+"""
+
+        # Use image URL if provided for visual context
+        if request.imageUrl:
+            result = await langchain_wrapper.call_openai_vision(
+                prompt=prompt,
+                image_url=request.imageUrl,
+                temperature=0.7,
+                max_tokens=150,
+            )
+        else:
+            # Text-only enhancement
+            messages = [{"role": "user", "content": prompt}]
+            result = await langchain_wrapper.call_openai_chat(
+                messages=messages,
+                temperature=0.7,
+                max_tokens=150,
+            )
+
+        caption = result.get("content", "").strip()
+
+        # Clean up the caption
+        if caption.startswith('"') and caption.endswith('"'):
+            caption = caption[1:-1]
+
+        return JSONResponse(content={"caption": caption})
+
+    except Exception as e:
+        logger.error(f"Fill caption error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to enhance caption: {str(e)}")
