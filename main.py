@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw, ImageFont # Import Pillow components
 from io import BytesIO # Import BytesIO
 from fastapi.responses import Response # Import Response
 from pydantic import BaseModel
+import boto3
 
 load_dotenv()
 
@@ -31,6 +32,9 @@ DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
+
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID")
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY")
 
 def convert_dms_to_decimal(dms, ref):
     degrees = dms[0]
@@ -553,3 +557,48 @@ async def signin(user: User):
         cur.close()
         conn.close()
 
+# Upload image to R2
+def upload_file_to_r2(file_name: str, object_name: str = None):
+    if object_name is None:
+        object_name = os.path.basename(file_name)
+
+    s3_client = boto3.client(
+        "s3",
+        endpoint_url="https://a6e3761e04e1dd48edfc4785be933f40.r2.cloudflarestorage.com",
+        aws_access_key_id=R2_ACCESS_KEY_ID,
+        aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+    )
+
+    s3_client.upload_file(file_name, "hackgt", object_name)
+    public_url = f"https://pub-c709b3551e424a1cbdc227494de91aa2.r2.dev/{object_name}"
+    return public_url
+
+@app.post("/upload-image-to-r2")
+async def upload_image_to_r2(file: UploadFile = File(...)):
+    if not file:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    # Create a temporary file to store the uploaded image
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        shutil.copyfileobj(file.file, temp_file)
+        temp_file_path = temp_file.name
+
+    try:
+        # Generate a unique object name for R2
+        file_extension = os.path.splitext(file.filename)[1]
+        object_name = f"{uuid.uuid4().hex}{file_extension}"
+
+        # Upload the file to R2
+        public_url = upload_file_to_r2(temp_file_path, object_name)
+
+        if not public_url:
+            raise HTTPException(
+                status_code=500, detail="Failed to upload file to Cloudflare R2"
+            )
+
+        return {"url": public_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
+    finally:
+        # Clean up the temporary file
+        os.remove(temp_file_path)
