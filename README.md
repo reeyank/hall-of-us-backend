@@ -1,181 +1,119 @@
-# Hall of Us Backend - LangChain API Wrapper
+# 🏛️ Hall of Us Backend — Modular, Agentic, and LangChain-Inspired
 
-A FastAPI backend with LangChain integration for specialized API operations including image tagging and filter generation.
+This backend powers **Hall of Us** — a museum-inspired social memories app built at HackGT! It is not just a simple API: it is a modular, agentic, and extensible backend inspired by LangChain, with custom FastAPI types, robust Pydantic v2 models, and a framework for building AI-driven, stateful, and composable API operations.
 
-## Features
+**Key highlights:**
 
-### 🏷️ Image Tagging API Set
+- Modular, agentic architecture for rapid extension and experimentation
+- Custom FastAPI types and Pydantic v2 models for every endpoint
+- LangChain-inspired API wrapper for unified, composable AI calls
+- Designed for hackathon speed _and_ production extensibility
 
-- **Generate tags from image URLs** - Analyze images hosted online
-- **Generate tags from base64 images** - Process uploaded image data
-- **Generate tags from file uploads** - Handle direct file uploads
-- Configurable confidence thresholds and tag limits
-- Structured response format with metadata
+## 🚀 Features
 
-### 🔍 Filter Generation API Set
+- **Modular, Agentic Framework**: Each API operation is a modular agent, making it easy to add, compose, or swap out logic. The backend is designed for agentic workflows and composable chains of logic.
+- **Custom FastAPI Types**: Every endpoint uses custom, strongly-typed Pydantic v2 models, ensuring robust request/response validation and seamless frontend/backend integration.
+- **LangChain-Inspired API Wrapper**: Unified interface for all AI calls (OpenAI, Google Vision, etc.), with built-in error handling, retries, logging, and batch processing.
+- **OpenAI Vision & Chat**: AI-powered tagging, captioning, and natural language filtering, with vision endpoints that can process both URLs and base64 images.
+- **Cedar OS Integration**: Handles complex Cedar OS state, including `allMemories`, and only reads/sends state to OpenAI when required by the user’s request.
+- **S3/R2 Uploads**: Secure image upload, EXIF extraction, and cloud storage support.
+- **Dynamic Filtering**: Natural language to backend filter generation, with LLM-driven logic (no rule-based fallback).
+- **Streaming Support**: Real-time streaming completions for chat and vision endpoints.
+- **Modern Python**: Async, type-annotated, modular, and hackathon-friendly.
 
-- **Natural language to filters** - Convert queries like "recent popular tech items" into structured filters
-- **Filter validation** - Validate generated filters against your available filter definitions
-- **Smart suggestions** - Get alternative filter suggestions
-- Support for various filter types: date ranges, categories, text search, numeric ranges
+## 🛠️ Endpoints (All with Custom Types & Modular Handlers)
 
-### 🔧 LangChain Wrapper
+- `POST /langchain/chat/completions` — Chat/vision completions (streaming or regular)
+- `POST /langchain/chat/generate-tags` — Generate tags for an image (URL, base64, or file)
+- `POST /langchain/chat/fill-tags` — Suggest additional tags
+- `POST /langchain/chat/generate-caption` — Generate a caption for an image
+- `POST /langchain/chat/fill-caption` — Enhance a caption
+- `POST /langchain/chat/filter_images` — AI-powered image filtering (tags, users, natural language)
+- `POST /photos/upload` — Upload a photo (with frame, EXIF, and S3/R2 support)
+- `GET /photos` — List all photos
+- `GET /photos/{image_id}` — Get a photo by ID
+- `POST /photos/{photo_id}/like` — Like a photo
+- `POST /photos/{photo_id}/unlike` — Unlike a photo
+- `GET /gps` — Get GPS data for all photos
+- `GET /plaque_text` — Generate a plaque image with text
+- `POST /signup` — User signup
+- `POST /signin` — User signin
 
-- **Unified API interface** - All API calls go through a consistent wrapper
-- **Error handling & retries** - Automatic retry logic with exponential backoff
-- **Monitoring & logging** - Built-in execution time tracking and error logging
-- **Batch processing** - Execute multiple API calls in parallel
-- **Timeout management** - Configurable timeouts for all operations
+## 🧠 LangChain, Agentic, and AI State Handling
 
-## API Endpoints
+- **Agentic Modular Design**: Each API operation is an agent — easy to extend, compose, and orchestrate. Add new endpoints or swap logic with minimal friction.
+- **Custom FastAPI/Pydantic Types**: All requests and responses use custom, strongly-typed models for robust validation and clear API contracts.
+- **LangChain-Inspired API Wrapper**: All AI calls (OpenAI, Google Vision, etc.) go through a unified, composable wrapper with error handling, retries, and logging.
+- **OpenAI Vision**: When a user asks about images, the backend extracts image URLs from Cedar state (e.g., `allMemories`) and sends them to OpenAI for analysis.
+- **Smart State Reading**: The backend only reads Cedar state if the user's request requires it (e.g., "show me my images"). By default, only the first 5 memories are included; if the user explicitly asks for "all" images, the entire state is used.
+- **Natural Language Filtering**: The `/filter_images` endpoint uses OpenAI to generate backend filters from tags, users, and freeform text, with no rule-based fallback.
 
-### Image Tagging
+## 🏗️ Project Structure (Modular & Extensible)
 
 ```
-POST /api/v1/image/tags/from-url      # Tag image from URL
-POST /api/v1/image/tags/from-base64   # Tag image from base64
-POST /api/v1/image/tags/from-file     # Tag uploaded image file
+main.py                 # FastAPI app entrypoint
+langchain_router.py     # FastAPI router with all endpoints (modular wiring)
+langchain/              # Core backend logic (agentic modules)
+    chat_handlers.py      # Modular AI chat, tagging, captioning, filtering logic (agentic)
+    response_utils.py     # Image extraction, response formatting
+    models.py             # Custom Pydantic v2 models for all endpoints
+    shared_context.py     # In-memory chat/session state
+    wrapper.py            # LangChain-inspired API wrapper (unified AI calls)
+    ...
+s3_upload.py            # S3/R2 upload helpers
+requirements.txt        # Python dependencies
+.env                    # Environment variables (OpenAI, S3, DB, etc)
 ```
 
-### Filter Generation
+## ⚡ Quickstart
 
-```
-POST /api/v1/filters/generate         # Generate filters from natural language
-POST /api/v1/filters/validate         # Validate filter configurations
-```
-
-### Testing
-
-```
-POST /api/v1/test/image-tagging       # Test image tagging with sample data
-POST /api/v1/test/filter-generation   # Test filter generation with sample data
-```
-
-## Quick Start
-
-### 1. Install Dependencies
+1. **Install dependencies:**
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Run the Server
+2. **Set up your `.env` file:**
+
+```
+OPENAI_API_KEY=sk-...
+S3_BUCKET_NAME=...
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+AWS_REGION=...
+DB_NAME=...
+DB_USER=...
+DB_PASSWORD=...
+DB_HOST=...
+DB_PORT=...
+```
+
+3. **Run the backend:**
 
 ```bash
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload
 ```
 
-### 3. Test the API
+4. **Connect the frontend:**
 
-Visit `http://localhost:8000/docs` for interactive API documentation.
+- The frontend expects the backend at `http://localhost:8000` by default.
+- See the frontend README for more details on API usage and integration.
 
-Or run the examples:
+## 🤝 Integration with Frontend
 
-```bash
-python examples.py
-```
+- Designed to work seamlessly with the Hall of Us Next.js/Cedar OS frontend.
+- Handles Cedar state, AI chat, and image analysis requests.
+- All API types and contracts are custom and robust, making frontend/backend integration smooth.
+- See the frontend repo for API call examples and state structure.
 
-## Example Usage
+## � Notes
 
-### Image Tagging
+- Modular, agentic, and extensible: add new endpoints or swap logic with minimal code changes.
+- Only reads and sends image state to OpenAI if the user request requires it ("show me my images").
+- For vision endpoints, only the first 5 images are sent unless the user explicitly asks for all.
+- All AI filtering is LLM-driven (no rule-based fallback).
+- For hackathon/demo use: not production-hardened, but easy to extend!
 
-```python
-from langchain_wrapper import image_tagging_api, ImageTaggingRequest
+---
 
-# Tag an image from URL
-request = ImageTaggingRequest(
-    image_url="https://example.com/image.jpg",
-    max_tags=5,
-    confidence_threshold=0.7
-)
-
-response = await image_tagging_api.generate_tags_from_url(request)
-print(response.data.tags)
-```
-
-### Filter Generation
-
-```python
-from langchain_wrapper import filter_generation_api, FilterGenerationRequest
-
-# Generate filters from natural language
-request = FilterGenerationRequest(
-    natural_language_query="Show me recent popular tech articles",
-    available_filters=[
-        {"field": "created_at", "type": "date", "operators": [">=", "<="]},
-        {"field": "category", "type": "categorical", "operators": ["==", "in"]},
-        {"field": "popularity_score", "type": "numeric", "operators": [">=", "<="]}
-    ],
-    max_filters=3
-)
-
-response = await filter_generation_api.generate_filters(request)
-print(response.data.generated_filters)
-```
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    FastAPI App (main.py)                │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌─────────────────┐    ┌──────────────────────────┐   │
-│  │ Image Tagging   │    │ Filter Generation        │   │
-│  │ API Set         │    │ API Set                  │   │
-│  └─────────────────┘    └──────────────────────────┘   │
-│           │                           │                │
-│           └───────────┬───────────────┘                │
-│                       │                                │
-│              ┌─────────────────┐                       │
-│              │ LangChain       │                       │
-│              │ API Wrapper     │                       │
-│              └─────────────────┘                       │
-│                       │                                │
-├─────────────────────────────────────────────────────────┤
-│         External APIs (OpenAI, Google Vision, etc.)    │
-└─────────────────────────────────────────────────────────┘
-```
-
-## Next Steps
-
-1. **Integrate Real APIs**: Replace the stub implementations with actual API calls:
-
-   - OpenAI Vision API for image tagging
-   - OpenAI GPT for natural language processing
-   - Google Vision API as alternative
-
-2. **Add Authentication**: Implement API key management and user authentication
-
-3. **Add Caching**: Implement Redis caching for expensive operations
-
-4. **Add Rate Limiting**: Prevent API abuse with rate limiting
-
-5. **Add Database Integration**: Store results and user preferences
-
-6. **Add More API Sets**: Create specialized wrappers for other operations
-
-## Configuration
-
-The system is designed to be easily configurable. Key configuration points:
-
-- **Timeout settings** - Adjust API call timeouts
-- **Retry logic** - Configure max retries and backoff strategy
-- **Logging levels** - Control verbosity of logging
-- **Model selection** - Choose which AI models to use for different tasks
-
-## Error Handling
-
-All API calls return a standardized `APIResponse` format:
-
-```python
-{
-    "success": bool,
-    "data": Any,           # Present when success=True
-    "error": str,          # Present when success=False
-    "timestamp": datetime,
-    "execution_time_ms": float
-}
-```
-
-This ensures consistent error handling across all API operations.
+Made with ❤️ at HackGT
