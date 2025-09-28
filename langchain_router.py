@@ -11,6 +11,7 @@ from langchain import (
     create_vision_response,
     extract_image_from_context,
     ChatHandlers,
+    ChatContext,
 )
 from langchain.models import (
     CedarCompletionRequest,
@@ -22,9 +23,10 @@ from langchain.models import (
 
 router = APIRouter(prefix="/langchain", tags=["LangChain"])
 
-# Initialize the LangChain wrapper and chat handlers
+# Initialize the LangChain wrapper, shared context, and chat handlers
 langchain_wrapper = LangChainAPIWrapper()
-chat_handlers = ChatHandlers(langchain_wrapper)
+shared_context = ChatContext()
+chat_handlers = ChatHandlers(langchain_wrapper, shared_context)
 
 
 @router.post("/chat/completions")
@@ -156,10 +158,10 @@ async def health_check():
 
 @router.post("/reset")
 async def reset_service():
-    """Reset the LangChain service state"""
+    """Reset the chat context state"""
     try:
-        langchain_wrapper.reset()
-        return {"status": "reset successful"}
+        shared_context.reset()
+        return {"status": "chat context reset successful"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Reset error: {str(e)}")
 
@@ -186,3 +188,30 @@ async def chat_generate_caption(request: ChatGenerateCaptionRequest):
 async def chat_fill_caption(request: ChatFillCaptionRequest):
     """Enhance or fill out an existing caption"""
     return await chat_handlers.fill_caption(request)
+
+
+# Context management endpoints
+@router.post("/chat/set-image")
+async def chat_set_image(image_url: str):
+    """Set the image URL in the shared context"""
+    try:
+        shared_context.set_image(image_url)
+        return {"status": "image set in context", "image_url": image_url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to set image: {str(e)}")
+
+
+@router.get("/chat/context")
+async def get_chat_context():
+    """Get current chat context state"""
+    try:
+        return {
+            "has_image": shared_context.has_image(),
+            "image_url": shared_context.get_image_url(),
+            "current_tags": shared_context.current_tags,
+            "current_caption": shared_context.current_caption,
+            "conversation_history_count": len(shared_context.conversation_history),
+            "context_summary": shared_context.get_context_summary()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get context: {str(e)}")

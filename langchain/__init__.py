@@ -11,6 +11,7 @@ from .response_utils import (
     extract_image_from_context,
 )
 from .chat_handlers import ChatHandlers
+from .shared_context import ChatContext
 
 __all__ = [
     "api_wrapper",
@@ -21,4 +22,5 @@ __all__ = [
     "create_vision_response",
     "extract_image_from_context",
     "ChatHandlers",
+    "ChatContext",
 ]

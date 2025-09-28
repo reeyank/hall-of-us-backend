@@ -8,7 +8,7 @@ class ChatContext:
     def __init__(self):
         self.reset()
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset all context state"""
         self.image_url: Optional[str] = None
         self.image_metadata: Dict[str, Any] = {}
@@ -18,14 +18,14 @@ class ChatContext:
         self.additional_context: Dict[str, Any] = {}
         logger.info("Chat context reset")
 
-    def set_image(self, image_url: str, metadata: Optional[Dict[str, Any]] = None):
+    def set_image(self, image_url: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Set the current image for all operations"""
         self.image_url = image_url
         if metadata:
             self.image_metadata = metadata
         logger.info(f"Image set in context: {image_url}")
 
-    def add_to_conversation(self, operation: str, request_data: Dict[str, Any], response_data: Dict[str, Any]):
+    def add_to_conversation(self, operation: str, request_data: Dict[str, Any], response_data: Dict[str, Any]) -> None:
         """Add an operation to the conversation history"""
         entry = {
             "operation": operation,
@@ -36,17 +36,17 @@ class ChatContext:
         self.conversation_history.append(entry)
         logger.debug(f"Added to conversation history: {operation}")
 
-    def update_tags(self, tags: List[str]):
+    def update_tags(self, tags: List[str]) -> None:
         """Update the current tags in context"""
         self.current_tags = tags
         logger.debug(f"Updated tags in context: {tags}")
 
-    def update_caption(self, caption: str):
+    def update_caption(self, caption: str) -> None:
         """Update the current caption in context"""
         self.current_caption = caption
         logger.debug(f"Updated caption in context: {caption}")
 
-    def set_additional_context(self, context: Dict[str, Any]):
+    def set_additional_context(self, context: Dict[str, Any]) -> None:
         """Set additional context information"""
         self.additional_context = context
         logger.debug("Updated additional context")
