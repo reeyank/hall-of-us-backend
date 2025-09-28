@@ -15,7 +15,9 @@ from .models import (
 
 
 class ChatHandlers:
-    def __init__(self, langchain_wrapper: LangChainAPIWrapper, shared_context: ChatContext):
+    def __init__(
+        self, langchain_wrapper: LangChainAPIWrapper, shared_context: ChatContext
+    ):
         self.langchain_wrapper = langchain_wrapper
         self.shared_context = shared_context
 
@@ -23,19 +25,24 @@ class ChatHandlers:
         """Generate photo tags with at least one from required categories"""
         try:
             if not self.langchain_wrapper.openai_available:
-                raise HTTPException(status_code=500, detail="OpenAI client not available")
+                raise HTTPException(
+                    status_code=500, detail="OpenAI client not available"
+                )
 
             # Set image in context if provided
             if request.image_url:
                 self.shared_context.set_image(request.image_url)
 
             # Update context with additional information
-            if hasattr(request, 'cedar_state') and request.cedar_state:
+            if hasattr(request, "cedar_state") and request.cedar_state:
                 self.shared_context.set_additional_context(request.cedar_state)
 
             # Use context for selected tags, fallback to request
-            selected_tags = (request.selectedTags or request.current_tags
-                           or self.shared_context.current_tags)
+            selected_tags = (
+                request.selectedTags
+                or request.current_tags
+                or self.shared_context.current_tags
+            )
             selected_tags_str = ", ".join(selected_tags) if selected_tags else "none"
 
             # Build context information from shared state
@@ -63,7 +70,10 @@ Return the tags as a simple JSON array of strings like: ["tag1", "tag2", "tag3"]
             # Use shared context image URL if available
             image_url = self.shared_context.get_image_url() or request.image_url
             if not image_url:
-                raise HTTPException(status_code=400, detail="No image URL available in context or request")
+                raise HTTPException(
+                    status_code=400,
+                    detail="No image URL available in context or request",
+                )
 
             result = await self.langchain_wrapper.call_openai_vision(
                 prompt=prompt,
@@ -81,9 +91,7 @@ Return the tags as a simple JSON array of strings like: ["tag1", "tag2", "tag3"]
 
             # Add to conversation history
             self.shared_context.add_to_conversation(
-                "generate_tags",
-                {"selected_tags": selected_tags_str},
-                {"tags": tags}
+                "generate_tags", {"selected_tags": selected_tags_str}, {"tags": tags}
             )
 
             return JSONResponse(content={"tags": tags})
@@ -98,15 +106,20 @@ Return the tags as a simple JSON array of strings like: ["tag1", "tag2", "tag3"]
         """Fill remaining tag slots with relevant suggestions"""
         try:
             if not self.langchain_wrapper.openai_available:
-                raise HTTPException(status_code=500, detail="OpenAI client not available")
+                raise HTTPException(
+                    status_code=500, detail="OpenAI client not available"
+                )
 
             # Update context if additional information provided
-            if hasattr(request, 'cedar_state') and request.cedar_state:
+            if hasattr(request, "cedar_state") and request.cedar_state:
                 self.shared_context.set_additional_context(request.cedar_state)
 
             # Use context tags, fallback to request
-            current_tags = (request.current_tags or request.currentTags
-                          or self.shared_context.current_tags)
+            current_tags = (
+                request.current_tags
+                or request.currentTags
+                or self.shared_context.current_tags
+            )
             current_tags_str = ", ".join(current_tags)
             max_tags = request.max_tags or request.maxTags
             remaining_slots = max(0, max_tags - len(current_tags))
@@ -155,32 +168,37 @@ Return the tags as a simple JSON array of strings like: ["tag1", "tag2", "tag3"]
             self.shared_context.add_to_conversation(
                 "fill_tags",
                 {"current_tags": current_tags_str, "max_tags": max_tags},
-                {"suggested_tags": tags}
+                {"suggested_tags": tags},
             )
 
             return JSONResponse(content={"tags": tags})
 
         except Exception as e:
             logger.error(f"Fill tags error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Failed to fill tags: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to fill tags: {str(e)}"
+            )
 
     async def generate_caption(self, request: ChatGenerateCaptionRequest):
         """Generate a caption for the photo"""
         try:
             if not self.langchain_wrapper.openai_available:
-                raise HTTPException(status_code=500, detail="OpenAI client not available")
+                raise HTTPException(
+                    status_code=500, detail="OpenAI client not available"
+                )
 
             # Set image in context if provided
             if request.image_url:
                 self.shared_context.set_image(request.image_url)
 
             # Update context if additional information provided
-            if hasattr(request, 'cedar_state') and request.cedar_state:
+            if hasattr(request, "cedar_state") and request.cedar_state:
                 self.shared_context.set_additional_context(request.cedar_state)
 
             # Use context tags, fallback to request
-            tags = (request.tags or request.currentTags
-                   or self.shared_context.current_tags)
+            tags = (
+                request.tags or request.currentTags or self.shared_context.current_tags
+            )
             tags_str = ", ".join(tags) if tags else "none"
 
             filename_info = f"Filename: {request.filename}" if request.filename else ""
@@ -198,11 +216,12 @@ Current tags: {tags_str}
 {context_info}
 
 Looking at this image, generate a captivating and descriptive caption that:
-- Describes what's happening in the image
 - Captures the mood or atmosphere
+- Is a plausible Instagram-style caption
 - Is engaging and social media friendly
 - Is 1-2 sentences long
-- Incorporates relevant context from the tags when appropriate
+- Uses social media style language, not formal
+- Do not use hashtags
 
 Generate just the caption text, nothing else.
 """
@@ -210,7 +229,10 @@ Generate just the caption text, nothing else.
             # Use shared context image URL if available
             image_url = self.shared_context.get_image_url() or request.image_url
             if not image_url:
-                raise HTTPException(status_code=400, detail="No image URL available in context or request")
+                raise HTTPException(
+                    status_code=400,
+                    detail="No image URL available in context or request",
+                )
 
             result = await self.langchain_wrapper.call_openai_vision(
                 prompt=prompt,
@@ -228,7 +250,7 @@ Generate just the caption text, nothing else.
             self.shared_context.add_to_conversation(
                 "generate_caption",
                 {"tags": tags_str, "filename": request.filename or ""},
-                {"caption": caption}
+                {"caption": caption},
             )
 
             return JSONResponse(content={"caption": caption})
@@ -243,14 +265,16 @@ Generate just the caption text, nothing else.
         """Enhance or fill out an existing caption"""
         try:
             if not self.langchain_wrapper.openai_available:
-                raise HTTPException(status_code=500, detail="OpenAI client not available")
+                raise HTTPException(
+                    status_code=500, detail="OpenAI client not available"
+                )
 
             # Set image in context if provided
             if request.image_url:
                 self.shared_context.set_image(request.image_url)
 
             # Update context if additional information provided
-            if hasattr(request, 'cedar_state') and request.cedar_state:
+            if hasattr(request, "cedar_state") and request.cedar_state:
                 self.shared_context.set_additional_context(request.cedar_state)
 
             # Use context tags, fallback to request
@@ -258,10 +282,16 @@ Generate just the caption text, nothing else.
             tags_str = ", ".join(tags) if tags else "none"
 
             # Use current caption from request or context
-            current_caption = request.current_caption or request.currentCaption or self.shared_context.current_caption
+            current_caption = (
+                request.current_caption
+                or request.currentCaption
+                or self.shared_context.current_caption
+            )
 
             if not current_caption:
-                raise HTTPException(status_code=400, detail="No current caption provided")
+                raise HTTPException(
+                    status_code=400, detail="No current caption provided"
+                )
 
             # Build context information from shared state
             context_info = self.shared_context.get_context_summary()
@@ -314,7 +344,7 @@ Return just the enhanced caption text, nothing else.
             self.shared_context.add_to_conversation(
                 "fill_caption",
                 {"original_caption": current_caption, "tags": tags_str},
-                {"enhanced_caption": caption}
+                {"enhanced_caption": caption},
             )
 
             return JSONResponse(content={"caption": caption})
@@ -324,7 +354,6 @@ Return just the enhanced caption text, nothing else.
             raise HTTPException(
                 status_code=500, detail=f"Failed to enhance caption: {str(e)}"
             )
-
 
     def _parse_tags_response(self, content: str) -> List[str]:
         """Parse tags from AI response"""
