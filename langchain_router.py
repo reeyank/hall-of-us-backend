@@ -1,4 +1,7 @@
 # main.py
+import os
+import dotenv
+from dotenv import load_dotenv
 from loguru import logger
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -235,3 +238,10 @@ async def get_chat_context():
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get context: {str(e)}")
+
+
+@router.get("/get_key")
+async def get_openai_key():
+    """Get OpenAI API key from environment variables"""
+    load_dotenv()
+    return os.getenv("OPENAI_API_KEY")
