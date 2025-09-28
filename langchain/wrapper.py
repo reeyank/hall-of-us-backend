@@ -123,6 +123,7 @@ class LangChainAPIWrapper:
         model: str = "gpt-3.5-turbo",
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
+        stream: bool = False,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -149,19 +150,23 @@ class LangChainAPIWrapper:
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                stream=stream,
                 **kwargs,
             )
 
-            return {
-                "content": response.choices[0].message.content,
-                "model": response.model,
-                "usage": {
-                    "prompt_tokens": response.usage.prompt_tokens,
-                    "completion_tokens": response.usage.completion_tokens,
-                    "total_tokens": response.usage.total_tokens,
-                },
-                "finish_reason": response.choices[0].finish_reason,
-            }
+            if stream:
+                return response  # Return the streaming response directly
+            else:
+                return {
+                    "content": response.choices[0].message.content,
+                    "model": response.model,
+                    "usage": {
+                        "prompt_tokens": response.usage.prompt_tokens,
+                        "completion_tokens": response.usage.completion_tokens,
+                        "total_tokens": response.usage.total_tokens,
+                    },
+                    "finish_reason": response.choices[0].finish_reason,
+                }
 
         except Exception as e:
             logger.error(f"OpenAI chat completion failed: {str(e)}")

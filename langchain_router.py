@@ -1,9 +1,10 @@
 # main.py
 from loguru import logger
 from fastapi import APIRouter, FastAPI, HTTPException, UploadFile, File
-from fastapi.responses import JSONResponse
-from typing import List, Dict, Any
+from fastapi.responses import JSONResponse, StreamingResponse
+from typing import List, Dict, Any, AsyncGenerator
 import base64
+import json
 from datetime import datetime
 
 from langchain import (
@@ -22,6 +23,47 @@ router = APIRouter(prefix="/langchain", tags=["LangChain"])
 langchain_wrapper = LangChainAPIWrapper()
 
 
+async def create_streaming_response(openai_stream, request_id: str) -> AsyncGenerator[str, None]:
+    """Convert OpenAI streaming response to Server-Sent Events format"""
+    try:
+        async for chunk in openai_stream:
+            if chunk.choices and len(chunk.choices) > 0:
+                choice = chunk.choices[0]
+
+                # Create the streaming response chunk in OpenAI format
+                response_chunk = {
+                    "id": request_id,
+                    "object": "chat.completion.chunk",
+                    "created": int(datetime.now().timestamp()),
+                    "model": chunk.model,
+                    "choices": [
+                        {
+                            "index": choice.index,
+                            "delta": {
+                                "content": choice.delta.content if choice.delta and choice.delta.content else ""
+                            },
+                            "finish_reason": choice.finish_reason
+                        }
+                    ]
+                }
+
+                # Send the chunk in SSE format
+                yield f"data: {json.dumps(response_chunk)}\n\n"
+
+                # If this is the last chunk, send the done signal
+                if choice.finish_reason:
+                    yield "data: [DONE]\n\n"
+                    break
+    except Exception as e:
+        logger.error(f"Streaming error: {str(e)}")
+        error_chunk = {
+            "id": request_id,
+            "object": "error",
+            "error": {"message": str(e), "type": "stream_error"}
+        }
+        yield f"data: {json.dumps(error_chunk)}\n\n"
+
+
 def extract_image_from_context(additional_context: Any) -> str | None:
     """Extract image URL from additionalContext if available"""
     if not additional_context:
@@ -37,7 +79,8 @@ def extract_image_from_context(additional_context: Any) -> str | None:
     return None
 
 
-@router.post("/completions")
+@router.post("/chat/completions")
+@router.post("/completions")  # Legacy endpoint for backward compatibility
 async def completions(request: CedarCompletionRequest):
     """
     Main completions endpoint for LangChain provider
@@ -119,10 +162,35 @@ async def completions(request: CedarCompletionRequest):
             logger.info(f"Processing text completion, stream={stream}")
 
             if stream:
-                # For now, return error for streaming - would need StreamingResponse
-                raise HTTPException(
-                    status_code=501, detail="Streaming not implemented yet"
-                )
+                # Handle streaming response
+                if langchain_wrapper.openai_available:
+                    try:
+                        openai_stream = await langchain_wrapper.call_openai_chat(
+                            messages=messages,
+                            temperature=temperature,
+                            max_tokens=max_tokens,
+                            stream=True,
+                        )
+
+                        request_id = f"chatcmpl-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+                        return StreamingResponse(
+                            create_streaming_response(openai_stream, request_id),
+                            media_type="text/plain",
+                            headers={
+                                "Cache-Control": "no-cache",
+                                "Connection": "keep-alive",
+                                "Content-Type": "text/plain; charset=utf-8",
+                            }
+                        )
+                    except Exception as e:
+                        raise HTTPException(
+                            status_code=500, detail=f"Streaming completion error: {str(e)}"
+                        )
+                else:
+                    raise HTTPException(
+                        status_code=500, detail="OpenAI client not available for streaming"
+                    )
             else:
                 # Use regular completion
                 if langchain_wrapper.openai_available:
