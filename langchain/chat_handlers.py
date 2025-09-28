@@ -11,6 +11,7 @@ from .models import (
     ChatFillTagsRequest,
     ChatGenerateCaptionRequest,
     ChatFillCaptionRequest,
+    ChatFilterImagesRequest,
 )
 
 
@@ -352,6 +353,148 @@ Return just the enhanced caption text, nothing else.
             logger.error(f"Fill caption error: {str(e)}")
             raise HTTPException(
                 status_code=500, detail=f"Failed to enhance caption: {str(e)}"
+            )
+
+    async def filter_images(self, request: ChatFilterImagesRequest):
+        """Generate backend filter objects based on cedar state and frontend activeFilters.
+
+        The method uses the same LLM wrapper as other handlers to generate a JSON list of
+        filters suitable for applying to image queries. Falls back to simple equality
+        filters constructed from the activeFilters if parsing/LLM fails.
+        """
+        try:
+            if not self.langchain_wrapper.openai_available:
+                raise HTTPException(
+                    status_code=500, detail="OpenAI client not available"
+                )
+
+            # Normalize fields that may come in camelCase or snake_case
+            cedar_state = (
+                getattr(request, "cedar_state", None)
+                or getattr(request, "cedarState", None)
+                or {}
+            )
+            active = (
+                getattr(request, "active_filters", None)
+                or getattr(request, "activeFilters", None)
+                or (cedar_state or {}).get("activeFilters")
+                or {}
+            )
+            available = (
+                getattr(request, "available_filters", None)
+                or getattr(request, "availableFilters", None)
+                or {}
+            )
+            all_tags = (
+                getattr(request, "all_tags", None)
+                or getattr(request, "allTags", None)
+                or []
+            )
+            all_user_ids = (
+                getattr(request, "all_user_ids", None)
+                or getattr(request, "allUserIds", None)
+                or []
+            )
+            limit = getattr(request, "limit", None) or 20
+
+            # Build a concise prompt describing available options and the desired output
+            prompt = (
+                "You are an assistant that converts a frontend 'cedar' chat state and user-selected "
+                "filter inputs into a backend-ready list of filter objects.\n\n"
+            )
+            prompt += f"Available filters/options: {json.dumps(available)}\n"
+            prompt += f"All tags: {json.dumps(all_tags)}\n"
+            prompt += f"All userIds: {json.dumps(all_user_ids)}\n"
+            prompt += f"Cedar state summary (messages and currentThreadId): {json.dumps({'messages': cedar_state.get('messages') if isinstance(cedar_state, dict) else None, 'currentThreadId': cedar_state.get('currentThreadId') if isinstance(cedar_state, dict) else None})}\n"
+            prompt += f"Active filters requested by user: {json.dumps(active)}\n\n"
+            prompt += (
+                "Return only JSON. The top-level object must contain a key 'filters' whose value is a list of "
+                'filter objects. Each filter object should be {"field": <field_name>, "operator": <op>, "value": <value>}.'
+            )
+            prompt += f"\nInclude at most {limit} filters and only include fields relevant to available filters.\n"
+
+            messages = [{"role": "user", "content": prompt}]
+
+            # Ask the LLM to produce structured filters
+            result = await self.langchain_wrapper.call_openai_chat(
+                messages=messages, temperature=0.2, max_tokens=400
+            )
+
+            content = result.get("content", "")
+
+            # Try to parse JSON from the model output robustly
+            filters = []
+            try:
+                # Find first JSON object or array
+                start_obj = content.find("{")
+                start_arr = content.find("[")
+                parsed = None
+                if start_obj != -1:
+                    parsed = json.loads(content[start_obj:])
+                    # If top-level is object with filters key
+                    if isinstance(parsed, dict) and "filters" in parsed:
+                        filters = parsed.get("filters", [])
+                    elif isinstance(parsed, list):
+                        filters = parsed
+                    else:
+                        # Try to find 'filters' nested
+                        filters = parsed.get("filters") or []
+                elif start_arr != -1:
+                    parsed = json.loads(content[start_arr:])
+                    filters = parsed
+            except Exception:
+                filters = []
+
+            # Fallback: build simple equality filters from active filters
+            if not filters:
+                act = active or {}
+                for k, v in act.items():
+                    if v is None or (isinstance(v, str) and v.strip() == ""):
+                        continue
+                    # Prefer tagging fields to use 'in' for lists, equality otherwise
+                    if k.lower() in ("tag", "tags"):
+                        # if value is list
+                        if isinstance(v, list):
+                            for val in v:
+                                filters.append(
+                                    {"field": "tag", "operator": "in", "value": val}
+                                )
+                        else:
+                            filters.append(
+                                {"field": "tag", "operator": "==", "value": v}
+                            )
+                    elif k.lower() in ("userid", "userId", "user_id"):
+                        filters.append(
+                            {"field": "userId", "operator": "==", "value": v}
+                        )
+                    elif k.lower() == "date":
+                        filters.append(
+                            {"field": "created_at", "operator": "==", "value": v}
+                        )
+                    else:
+                        filters.append({"field": k, "operator": "==", "value": v})
+
+            # Limit filters
+            if isinstance(filters, list) and len(filters) > limit:
+                filters = filters[:limit]
+
+            # Save to conversation history for traceability
+            try:
+                self.shared_context.add_to_conversation(
+                    "filter_images",
+                    {"active_filters": active, "available": available},
+                    {"filters": filters},
+                )
+            except Exception:
+                # Non-fatal if shared context fails
+                logger.debug("Failed to add filter_images to conversation history")
+
+            return JSONResponse(content={"filters": filters}, status_code=200)
+
+        except Exception as e:
+            logger.error(f"Filter images error: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Failed to generate filters: {str(e)}"
             )
 
     def _parse_tags_response(self, content: str) -> List[str]:
