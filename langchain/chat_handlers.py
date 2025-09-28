@@ -489,6 +489,40 @@ Return just the enhanced caption text, nothing else.
                 # Non-fatal if shared context fails
                 logger.debug("Failed to add filter_images to conversation history")
 
+            # Persist active/derived filters into shared context for frontend state sync
+            try:
+                # store full filter payload in additional_context under 'filters'
+                self.shared_context.set_additional_context(
+                    {
+                        "activeFilters": active,
+                        "availableFilters": available,
+                        "generatedFilters": filters,
+                        "allTags": all_tags,
+                        "allUserIds": all_user_ids,
+                    }
+                )
+
+                # If filters include tag constraints, update current_tags in context
+                tag_values = []
+                for f in filters:
+                    try:
+                        field = f.get("field", "").lower()
+                        val = f.get("value")
+                        if field in ("tag", "tags"):
+                            if isinstance(val, list):
+                                tag_values.extend(val)
+                            else:
+                                tag_values.append(val)
+                    except Exception:
+                        continue
+
+                if tag_values:
+                    # dedupe and set
+                    unique_tags = list(dict.fromkeys([t for t in tag_values if t]))
+                    self.shared_context.update_tags(unique_tags)
+            except Exception:
+                logger.debug("Failed to persist filters into shared context")
+
             return JSONResponse(content={"filters": filters}, status_code=200)
 
         except Exception as e:
