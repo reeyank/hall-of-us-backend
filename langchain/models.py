@@ -150,7 +150,6 @@ class ImageTaggingRequest(BaseModel):
     """Request model for image tagging"""
 
     image_url: Optional[str] = None
-    image_base64: Optional[str] = None
     image_path: Optional[str] = None
     max_tags: int = 10
     confidence_threshold: float = 0.5
@@ -656,7 +655,6 @@ class ChatGenerateTagsRequest(BaseModel):
     """Request model for generating photo tags"""
 
     image_url: Optional[str] = None
-    image_base64: Optional[str] = None
     current_tags: List[str] = []
     cedar_state: Optional[Dict[str, Any]] = None
 
@@ -686,7 +684,6 @@ class ChatFillTagsRequest(BaseModel):
     """Request model for filling remaining photo tags"""
 
     image_url: Optional[str] = None
-    image_base64: Optional[str] = None
     current_tags: List[str]
     max_tags: int
     needed_tags: Optional[List[str]] = None
@@ -718,7 +715,6 @@ class ChatGenerateCaptionRequest(BaseModel):
     """Request model for generating photo captions"""
 
     image_url: Optional[str] = None
-    image_base64: Optional[str] = None
     tags: List[str] = []
     filename: Optional[str] = None
     cedar_state: Optional[Dict[str, Any]] = None
@@ -750,7 +746,6 @@ class ChatFillCaptionRequest(BaseModel):
 
     current_caption: str
     image_url: Optional[str] = None
-    image_base64: Optional[str] = None
     tags: List[str] = []
     filename: Optional[str] = None
     cedar_state: Optional[Dict[str, Any]] = None

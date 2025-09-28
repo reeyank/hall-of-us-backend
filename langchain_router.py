@@ -3,7 +3,6 @@ from loguru import logger
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse, StreamingResponse
 from typing import List, Dict, Any, AsyncGenerator
-import base64
 import json
 from datetime import datetime
 
@@ -307,15 +306,10 @@ Looking at this image, generate 5-8 relevant and descriptive tags. The tags shou
 Return the tags as a simple JSON array of strings like: ["tag1", "tag2", "tag3"]
 """
 
-        # Call OpenAI Vision API - ALWAYS use base64, never URL
-        if not request.image_base64:
-            raise HTTPException(
-                status_code=400, detail="image_base64 is required for vision API calls"
-            )
-
+        # Call OpenAI Vision API - ALWAYS use URL
         result = await langchain_wrapper.call_openai_vision(
             prompt=prompt,
-            image_base64=request.image_base64,
+            image_url=request.image_url if request.image_url else None,
             temperature=0.7,
             max_tokens=200,
         )
@@ -475,15 +469,15 @@ Looking at this image, generate a captivating and descriptive caption that:
 Generate just the caption text, nothing else.
 """
 
-        # Call OpenAI Vision API - ALWAYS use base64, never URL
-        if not request.image_base64:
+        # Call OpenAI Vision API - ALWAYS use URL
+        if not request.image_url:
             raise HTTPException(
-                status_code=400, detail="image_base64 is required for vision API calls"
+                status_code=400, detail="image_url is required for vision API calls"
             )
 
         result = await langchain_wrapper.call_openai_vision(
             prompt=prompt,
-            image_base64=request.image_base64,
+            image_url=request.image_url,
             temperature=0.8,
             max_tokens=100,
         )
@@ -540,11 +534,11 @@ If the current caption is already good, you can make minor improvements or keep 
 Return just the enhanced caption text, nothing else.
 """
 
-        # Use base64 for visual context - ALWAYS use base64, never URL
-        if request.image_base64:
+        # Use URL for visual context - ALWAYS use URL, never base64
+        if request.image_url:
             result = await langchain_wrapper.call_openai_vision(
                 prompt=prompt,
-                image_base64=request.image_base64,
+                image_url=request.image_url,
                 temperature=0.7,
                 max_tokens=150,
             )
