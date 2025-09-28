@@ -219,7 +219,7 @@ Looking at this image, generate a captivating and descriptive caption that:
 - Captures the mood or atmosphere
 - Is a plausible Instagram-style caption
 - Is engaging and social media friendly
-- Is 1-2 sentences long
+- Is max 50 characters long
 - Uses social media style language, not formal
 - Do not use hashtags
 
@@ -305,14 +305,13 @@ Current caption: "{current_caption}"
 Tags: {tags_str}
 {context_info}
 
-Please enhance this caption by:
-- Making it more engaging and descriptive
-- Adding relevant details that complement the existing caption
-- Keeping the original tone and style
-- Making it 1-3 sentences long
-- Incorporating relevant context from tags when appropriate
-
-If the current caption is already good, you can make minor improvements or keep it mostly the same.
+Please FINISH this caption, DO NOT OVERWRITE WHAT IS ALREADY THERE. Start from the existing caption and make it more engaging. The enhanced caption should:
+- Captures the mood or atmosphere
+- Is a plausible Instagram-style caption
+- Is engaging and social media friendly
+- Is max 50 characters long
+- Uses social media style language, not formal
+- Do not use hashtags
 
 Return just the enhanced caption text, nothing else.
 """
