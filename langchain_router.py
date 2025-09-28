@@ -154,6 +154,15 @@ async def health_check():
     return {"status": "healthy", "service": "hall-of-us-backend"}
 
 
+@router.post("/reset")
+async def reset_service():
+    """Reset the LangChain service state"""
+    try:
+        langchain_wrapper.reset()
+        return {"status": "reset successful"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Reset error: {str(e)}")
+
 # Chat endpoints for frontend integration
 @router.post("/chat/generate-tags")
 async def chat_generate_tags(request: ChatGenerateTagsRequest):
