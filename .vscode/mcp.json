@@ -1,9 +1,0 @@
-{
-  "servers": {
-    "cedar-mcp": {
-      "type": "http",
-      "url": "https://mcpwithcedar-production.up.railway.app/jsonrpc"
-    }
-  }
-}
-

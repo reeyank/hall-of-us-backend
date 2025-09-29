@@ -106,6 +106,11 @@ uvicorn main:app --reload
 - All API types and contracts are custom and robust, making frontend/backend integration smooth.
 - See the frontend repo for API call examples and state structure.
 
+### 🪢 Sister Repositories
+- [hall-of-us-frontend (Frontend API)](https://github.com/reeyank/hall-of-us-backend)
+- [Hall-Of-Us-XR (XR Experience)](https://github.com/zaid-ahmed1/Hall-Of-Us-XR/)
+
+
 ## � Notes
 
 - Modular, agentic, and extensible: add new endpoints or swap logic with minimal code changes.
